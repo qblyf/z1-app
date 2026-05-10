@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../router/app_router.dart';
 import '../../providers/employee_score_providers.dart';
 import '../../models/employee_score.dart';
 import '../../theme/app_theme.dart';
@@ -50,8 +52,25 @@ class _RankingPageState extends ConsumerState<RankingPage> {
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('红黑榜'),
+      navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
+        middle: const Text('红黑榜'),
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Icon(CupertinoIcons.chart_bar_alt_fill, size: 22),
+          onPressed: () => context.push(Routes.employeeScoreRankingDetail),
+        ),
       ),
       child: SafeArea(
         child: Column(

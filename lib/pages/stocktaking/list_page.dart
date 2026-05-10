@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/stocktaking_api.dart';
 import '../../models/stocktaking.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 库存盘点列表页
 class StocktakingListPage extends ConsumerStatefulWidget {
@@ -89,6 +90,18 @@ class _StocktakingListPageState extends ConsumerState<StocktakingListPage> {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('库存盘点'),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,

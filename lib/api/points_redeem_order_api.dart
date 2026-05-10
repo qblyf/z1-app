@@ -61,4 +61,34 @@ class PointsRedeemOrderApi {
     if (data == null) return null;
     return PointsRedeemOrder.fromJson(data);
   }
+
+  /// 审核通过退款（已支付状态的退款申请）
+  /// 对应 PWA auditPointsRedeemOrderRefundApply
+  Future<bool> auditRefund(int id) async {
+    final res = await _client.post(
+      '/points-redeem/order/audit-refund',
+      data: {'id': id},
+    );
+    return res.data['code'] == 0;
+  }
+
+  /// 拒绝退款（取消退款申请）
+  /// 对应 PWA rejectPointsRedeemOrderRefundApply
+  Future<bool> rejectRefund(int id) async {
+    final res = await _client.post(
+      '/points-redeem/order/reject-refund',
+      data: {'id': id},
+    );
+    return res.data['code'] == 0;
+  }
+
+  /// 添加备注
+  /// 对应 PWA pointsRedeemOrderAddRemarks
+  Future<bool> addRemarks(int id, String remarks) async {
+    final res = await _client.post(
+      '/points-redeem/order/add-remarks',
+      data: {'id': id, 'remarks': remarks},
+    );
+    return res.data['code'] == 0;
+  }
 }

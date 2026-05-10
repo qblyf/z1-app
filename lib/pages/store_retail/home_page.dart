@@ -7,6 +7,7 @@ import '../../models/user.dart';
 import '../../models/store_retail.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../router/app_router.dart';
 
 /// 门店零售会员首页 Provider
 final storeRetailMemberProvider =

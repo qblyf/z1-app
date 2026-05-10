@@ -336,4 +336,54 @@ class StocktakingApi {
     final res = await _client.post('/stock-taking-on-duty/refuse', data: body);
     return res.data['code'] == 10000;
   }
+
+  /// 获取盘库库存列表
+  /// GET /stock-taking/inventory?warehouseIDs=X&limit=X
+  Future<List<Map<String, dynamic>>> getInventory({
+    required List<int> warehouseIDs,
+    List<int>? cateIDs,
+    List<int>? spuIDs,
+    List<int>? skuIDs,
+    int limit = 500,
+    int offset = 0,
+  }) async {
+    final queryParams = <String, dynamic>{
+      'warehouseIDs': warehouseIDs.join(','),
+      'limit': limit,
+      'offset': offset,
+    };
+    if (cateIDs != null && cateIDs.isNotEmpty) {
+      queryParams['cateIDs'] = cateIDs.join(',');
+    }
+    if (spuIDs != null && spuIDs.isNotEmpty) {
+      queryParams['spuIDs'] = spuIDs.join(',');
+    }
+    if (skuIDs != null && skuIDs.isNotEmpty) {
+      queryParams['skuIDs'] = skuIDs.join(',');
+    }
+
+    final res = await _client.get(
+      '/stock-taking/inventory',
+      queryParameters: queryParams,
+    );
+    final data = res.data['res'] as List<dynamic>? ?? [];
+    return data.map((e) => e as Map<String, dynamic>).toList();
+  }
+
+  /// 根据条码获取货品库存
+  /// GET /stock-taking/barcode?warehouseIDs=X&barcode=X
+  Future<List<Map<String, dynamic>>> getStockByBarcode({
+    required List<int> warehouseIDs,
+    required String barcode,
+  }) async {
+    final res = await _client.get(
+      '/stock-taking/barcode',
+      queryParameters: {
+        'warehouseIDs': warehouseIDs.join(','),
+        'barcode': barcode,
+      },
+    );
+    final data = res.data['res'] as List<dynamic>? ?? [];
+    return data.map((e) => e as Map<String, dynamic>).toList();
+  }
 }

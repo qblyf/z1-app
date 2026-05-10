@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/repair_order_api.dart';
 import '../../models/repair_order.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 final _filterProvider = StateProvider<_RepairFilter>((ref) => _RepairFilter());
 
@@ -110,6 +111,18 @@ class _RepairOrderListPageState extends ConsumerState<RepairOrderListPage> {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('维修单'),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,

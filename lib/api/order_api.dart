@@ -416,6 +416,23 @@ class OrderApi {
     return count as int? ?? 0;
   }
 
+  /// 获取商城订单完整详情（网销订单版）
+  /// 后端 GET /mall-order/new-order-mall-order-detail?mallOrderNumber=X
+  /// 返回更丰富的订单信息，包含网销订单、商品、服务、赠品等
+  Future<MallOrderFullDetail> getNewOrderDetailByMallNumber(String orderNumber) async {
+    final response = await _client.get(
+      '/mall-order/new-order-mall-order-detail',
+      queryParameters: {'mallOrderNumber': orderNumber},
+    );
+    final data = response.data;
+    // 后端返回 { code, res: { ... } }
+    final res = data['res'] ?? data;
+    if (res is Map<String, dynamic>) {
+      return MallOrderFullDetail.fromJson(res);
+    }
+    throw Exception('未找到订单详情');
+  }
+
   /// 获取商城订单详情
   /// 后端 GET /mall-order/detail
   Future<MallOrder> getMallOrderDetail(String orderNumber) async {

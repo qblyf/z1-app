@@ -4,6 +4,7 @@ import '../../api/ahs_api.dart';
 import '../../models/ahs_order.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../router/app_router.dart';
 
 /// 掌上回收单详情页
 class PalmRecycleOrderDetailPage extends ConsumerStatefulWidget {

@@ -1,11 +1,11 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../api/store_retail_api.dart';
 import '../../api/warehouse_api.dart';
 import '../../api/transfer_order_api.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 调拨出库页
 /// 对应 PWA /pages/path-d/transfer-order/out-warehouse.tsx
@@ -19,7 +19,6 @@ class TransferOutWarehousePage extends ConsumerStatefulWidget {
 
 class _TransferOutWarehousePageState
     extends ConsumerState<TransferOutWarehousePage> {
-  final StoreRetailApi _retailApi = StoreRetailApi();
   final WarehouseApi _warehouseApi = WarehouseApi();
   final TransferOrderApi _transferApi = TransferOrderApi();
 
@@ -54,7 +53,7 @@ class _TransferOutWarehousePageState
 
       // 如果用户有部门，获取该部门对应的仓库
       if (deptId > 0) {
-        final deptWarehouseIds = await _warehouseApi.getWarehouseIdsByDeptId(deptId);
+        final deptWarehouseIds = await _warehouseApi.getWarehouseIdsByMainDeptId(deptId);
         // 优先显示当前部门对应的仓库
         final deptWarehouses = warehouses.where((w) => deptWarehouseIds.contains(w.id)).toList();
         if (deptWarehouses.isNotEmpty) {
@@ -697,7 +696,7 @@ class _ProductCard extends StatelessWidget {
               ),
               CupertinoButton(
                 padding: EdgeInsets.zero,
-                minSize: 0,
+                minimumSize: const Size(0, 0),
                 onPressed: onRemove,
                 child: const Icon(CupertinoIcons.trash, size: 18, color: Color(0xFFFF3B30)),
               ),

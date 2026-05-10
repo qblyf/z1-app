@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../api/goods_api.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 序列号搜索页面
 /// 对应 PWA /pages/path-d/goods/search.tsx

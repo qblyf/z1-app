@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import '../models/order.dart';
+import '../models/discount_log.dart';
 import '../api/order_api.dart';
+import '../api/discount_log_api.dart';
 
 /// 商城订单列表 Provider
 final mallOrderListProvider = StateNotifierProvider<MallOrderListNotifier, AsyncValue<List<MallOrder>>>((ref) {
@@ -76,6 +78,21 @@ class MallOrderListNotifier extends StateNotifier<AsyncValue<List<MallOrder>>> {
 /// 订单 API Provider
 final orderApiProvider = Provider<OrderApi>((ref) {
   return OrderApi();
+});
+
+/// 折扣日志 API Provider
+final discountLogApiProvider = Provider<DiscountLogApi>((ref) {
+  return DiscountLogApi();
+});
+
+/// 折扣审批详情 Provider
+/// 根据 MallOrderFullDetail 的 discountApprovalZID 获取折扣审批状态
+/// 仅在 hasDiscountApproval && needsDiscountApproval 时使用
+final discountApprovalProvider =
+    FutureProvider.family<List<DiscountLog>, String?>((ref, zid) async {
+  if (zid == null || zid.isEmpty) return [];
+  final api = ref.read(discountLogApiProvider);
+  return api.getApprovalDetail(zid);
 });
 
 /// 订单列表 Provider

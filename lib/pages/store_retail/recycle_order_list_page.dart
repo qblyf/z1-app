@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/recycle_order_api.dart';
 import '../../models/recycle_order.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 回收订单列表页
 class RecycleOrderListPage extends ConsumerStatefulWidget {
@@ -101,8 +102,8 @@ class _RecycleOrderListPageState
         ),
       ]);
 
-      final data = results[0];
-      final stats = results[1];
+      final data = results[0] as List<RecycleOrder>;
+      final stats = results[1] as List<RecycleOrderStatistics>;
 
       setState(() {
         if (refresh) {
@@ -149,6 +150,18 @@ class _RecycleOrderListPageState
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('回收订单'),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
@@ -364,7 +377,7 @@ class _StatItem extends StatelessWidget {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: valueColor ?? AppColors.textPrimary,
+            color: valueColor ?? CupertinoColors.label,
           ),
         ),
       ],

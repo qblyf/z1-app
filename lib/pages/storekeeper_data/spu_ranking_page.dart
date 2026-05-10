@@ -5,6 +5,7 @@ import '../../api/storekeeper_data_api.dart';
 import '../../models/storekeeper_data.dart';
 import '../../theme/app_theme.dart';
 import 'sku_ranking_page.dart';
+import '../../router/app_router.dart';
 
 final _spuTimeRangeProvider = NotifierProvider<_SpuTimeRangeNotifier, ({int start, int end})>(_SpuTimeRangeNotifier.new);
 

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:z1_app/api/api_client.dart';
 
 /// 通用草稿 API
@@ -63,6 +64,60 @@ class DraftApi {
     return response.data['count'] as int? ?? 0;
   }
 
+  /// 获取草稿详情
+  /// GET /draft/detail?id=X
+  Future<GeneralDraft?> getDetail(int id) async {
+    final response = await _client.get('/draft/detail', queryParameters: {'id': id});
+    final list = response.data['list'] ?? response.data['res'];
+    if (list is List && list.isNotEmpty) {
+      return GeneralDraft.fromJson(list[0] as Map<String, dynamic>);
+    }
+    return null;
+  }
+
+  /// 保存草稿（新建）
+  /// POST /draft/add
+  /// 返回新建的草稿ID
+  Future<int> save({
+    required String type,
+    required List<int> users,
+    required Map<String, dynamic> data,
+    String? associated,
+    String? remarks,
+  }) async {
+    final requestData = <String, dynamic>{
+      'type': type,
+      'users': users,
+      'data': data,
+    };
+    if (associated != null) requestData['associated'] = associated;
+    if (remarks != null) requestData['remarks'] = remarks;
+
+    final response = await _client.post('/draft/add', data: requestData);
+    final res = response.data['res'];
+    if (res is int) return res;
+    return 0;
+  }
+
+  /// 更新草稿
+  /// POST /draft/edit
+  Future<bool> update({
+    required int id,
+    List<int>? users,
+    Map<String, dynamic>? data,
+    String? associated,
+    String? remarks,
+  }) async {
+    final requestData = <String, dynamic>{'id': id};
+    if (users != null) requestData['users'] = users;
+    if (data != null) requestData['data'] = data;
+    if (associated != null) requestData['associated'] = associated;
+    if (remarks != null) requestData['remarks'] = remarks;
+
+    final response = await _client.post('/draft/edit', data: requestData);
+    return response.data['res'] == true || response.data['code'] == 10000;
+  }
+
   /// 合并调拨单草稿
   /// POST /draft/merged/transfer
   Future<int> mergeTransfer(List<int> draftIds) async {
@@ -86,13 +141,30 @@ class DraftApi {
   }
 }
 
-/// 通用草稿类型枚举
+/// 通用草稿类型枚举（字符串类型，用于 API）
+enum DraftTypeStr {
+  purchaseOrder('purchase-order', '采购订单'),
+  transferOrder('transfer-order', '调拨订单');
+
+  const DraftTypeStr(this.value, this.label);
+  final String value;
+  final String label;
+
+  static DraftTypeStr? fromValue(String v) {
+    for (final t in values) {
+      if (t.value == v) return t;
+    }
+    return null;
+  }
+}
+
+/// 通用草稿类型枚举（旧版数值类型）
 enum GeneralDraftType {
-  标品调拨(1, '标品调拨'),
-  智能回调(2, '智能回调'),
-  智能配货(3, '智能配货'),
-  快捷调拨(4, '快捷调拨'),
-  组内调拨(5, '组内调拨');
+  standardTransfer(1, '标品调拨'),
+  smartCallback(2, '智能回调'),
+  smartDistribution(3, '智能配货'),
+  quickTransfer(4, '快捷调拨'),
+  groupTransfer(5, '组内调拨');
 
   final int value;
   final String label;
@@ -114,6 +186,14 @@ class GeneralDraft {
   final String createdBy;
   final int createdAt;
   final int updatedAt;
+  /// 字符串类型（新版）
+  final String? typeStr;
+  /// 备注
+  final String? remarks;
+  /// 关联单号
+  final String? associated;
+  /// 创建人名称
+  final String? creatorName;
 
   GeneralDraft({
     required this.id,
@@ -122,123 +202,63 @@ class GeneralDraft {
     required this.createdBy,
     required this.createdAt,
     required this.updatedAt,
+    this.typeStr,
+    this.remarks,
+    this.associated,
+    this.creatorName,
   });
 
   factory GeneralDraft.fromJson(Map<String, dynamic> json) {
     return GeneralDraft(
       id: json['id'] as int? ?? 0,
       type: json['type'] as int? ?? 0,
-      data: json['data'] as String?,
+      data: json['data'] is String
+          ? json['data'] as String
+          : (json['data'] != null ? jsonEncode(json['data']) : null),
       createdBy: json['createdBy']?.toString() ?? '',
       createdAt: json['createdAt'] as int? ?? 0,
       updatedAt: json['updatedAt'] as int? ?? 0,
+      typeStr: json['typeStr'] as String? ?? json['type']?.toString(),
+      remarks: json['remarks'] as String?,
+      associated: json['associated'] as String?,
+      creatorName: json['creatorName'] as String?,
     );
   }
 
   GeneralDraftType? get draftType => GeneralDraftType.fromValue(type);
 
+  /// 字符串类型枚举
+  DraftTypeStr? get draftTypeStr => typeStr != null ? DraftTypeStr.fromValue(typeStr!) : null;
+
+  /// 格式化创建时间
+  String get formattedCreatedAt {
+    if (createdAt == 0) return '-';
+    final dt = DateTime.fromMillisecondsSinceEpoch(createdAt * 1000);
+    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+  }
+
   /// 提取入库仓库ID
   int? get inWarehouseId {
-    if (data == null) return null;
-    try {
-      final Map<String, dynamic> d = _parseData();
-      return d['inWarehouseID'] as int?;
-    } catch (_) {
-      return null;
-    }
+    final d = parseData();
+    return d['inWarehouseID'] as int?;
   }
 
   /// 提取出库仓库ID
   int? get outWarehouseId {
-    if (data == null) return null;
-    try {
-      final Map<String, dynamic> d = _parseData();
-      return d['outWarehouseID'] as int?;
-    } catch (_) {
-      return null;
-    }
+    final d = parseData();
+    return d['outWarehouseID'] as int?;
   }
 
-  Map<String, dynamic> _parseData() {
+  /// 解析 data 字段为 Map
+  Map<String, dynamic> parseData() {
     if (data == null) return {};
     if (data!.startsWith('{')) {
-      return Map<String, dynamic>.from(
-        _parseJson(data!) ?? {},
-      );
-    }
-    return {};
-  }
-
-  static Map<String, dynamic>? _parseJson(String s) {
-    try {
-      int i = 0;
-      return _parseObject(s, i).$1;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  static (Map<String, dynamic>?, int) _parseObject(String s, int i) {
-    final map = <String, dynamic>{};
-    i++; // skip {
-    while (i < s.length) {
-      if (s[i] == '}') { i++; break; }
-      if (s[i] == '"') {
-        final (key, ni) = _parseString(s, i);
-        i = ni;
-        while (i < s.length && (s[i] == ' ' || s[i] == ':')) i++;
-        final (value, ni2) = _parseValue(s, i);
-        map[key] = value;
-        i = ni2;
-      } else {
-        i++;
+      try {
+        return Map<String, dynamic>.from(jsonDecode(data!) as Map);
+      } catch (_) {
+        return {};
       }
     }
-    return (map, i);
-  }
-
-  static (String, int) _parseString(String s, int i) {
-    i++; // skip opening "
-    final buf = StringBuffer();
-    while (i < s.length) {
-      if (s[i] == '"') { i++; break; }
-      if (s[i] == '\\' && i + 1 < s.length) { i++; }
-      buf.write(s[i]);
-      i++;
-    }
-    return (buf.toString(), i);
-  }
-
-  static (dynamic, int) _parseValue(String s, int i) {
-    while (i < s.length && (s[i] == ' ' || s[i] == ',')) i++;
-    if (i >= s.length) return (null, i);
-    if (s[i] == '"') {
-      final (v, ni) = _parseString(s, i);
-      return (v, ni);
-    }
-    if (s[i] == '{') return _parseObject(s, i);
-    if (s[i] == '[') return _parseArray(s, i);
-    if (s[i] == 't' && s.substring(i).startsWith('true')) return (true, i + 4);
-    if (s[i] == 'f' && s.substring(i).startsWith('false')) return (false, i + 5);
-    if (s[i] == 'n' && s.substring(i).startsWith('null')) return (null, i + 4);
-    // number
-    final start = i;
-    while (i < s.length && (s[i].contains(RegExp(r'[0-9.eE+-]')))) i++;
-    final numStr = s.substring(start, i);
-    if (numStr.contains('.')) return (double.tryParse(numStr), i);
-    return (int.tryParse(numStr), i);
-  }
-
-  static (List<dynamic>, int) _parseArray(String s, int i) {
-    final list = <dynamic>[];
-    i++; // skip [
-    while (i < s.length) {
-      if (s[i] == ']') { i++; break; }
-      final (v, ni) = _parseValue(s, i);
-      list.add(v);
-      i = ni;
-      while (i < s.length && (s[i] == ' ' || s[i] == ',')) i++;
-    }
-    return (list, i);
+    return {};
   }
 }

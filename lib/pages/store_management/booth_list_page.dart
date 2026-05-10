@@ -6,6 +6,7 @@ import '../../api/display_standard_api.dart';
 import '../../models/display_case.dart';
 import '../../models/display_standard.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// Booth（展位）列表页
 class BoothListPage extends ConsumerStatefulWidget {
@@ -167,6 +168,18 @@ class _BoothListPageState extends ConsumerState<BoothListPage> {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('展位列表'),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,

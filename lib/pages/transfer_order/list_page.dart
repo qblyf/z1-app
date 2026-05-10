@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/transfer_order_api.dart';
 import '../../models/transfer_order.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 调拨单列表页
 class TransferOrderListPage extends ConsumerStatefulWidget {
@@ -102,6 +103,18 @@ class _TransferOrderListPageState extends ConsumerState<TransferOrderListPage> {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('调拨单'),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,

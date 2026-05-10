@@ -7,6 +7,7 @@ import '../../api/order_api.dart';
 import '../../models/order.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../router/app_router.dart';
 
 /// 销售数据 API Provider
 final salesDataApiProvider = Provider<SalesDataApi>((ref) => SalesDataApi());
@@ -472,74 +473,77 @@ class _RecycleOrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.md),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: CupertinoColors.white,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: AppShadows.card,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  order.orderNumber,
-                  style: const TextStyle(fontWeight: FontWeight.w500),
+    return GestureDetector(
+      onTap: () => context.push('/salesperson-data/recycle-order/${order.orderNumber}'),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: AppSpacing.md),
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: CupertinoColors.white,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          boxShadow: AppShadows.card,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    order.orderNumber,
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
                 ),
-              ),
-              StatusBadge(
-                label: _getRecycleStatusLabel(order.status),
-                color: _getRecycleStatusColor(order.status),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              if (order.userName != null) ...[
+                StatusBadge(
+                  label: _getRecycleStatusLabel(order.status),
+                  color: _getRecycleStatusColor(order.status),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                if (order.userName != null) ...[
+                  Icon(
+                    CupertinoIcons.person,
+                    size: 14,
+                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    order.userName!,
+                    style: TextStyle(
+                      color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                ],
                 Icon(
-                  CupertinoIcons.person,
+                  CupertinoIcons.clock,
                   size: 14,
                   color: CupertinoColors.secondaryLabel.resolveFrom(context),
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  order.userName!,
+                  _formatTime(order.createdAt),
                   style: TextStyle(
                     color: CupertinoColors.secondaryLabel.resolveFrom(context),
                     fontSize: 12,
                   ),
                 ),
-                const SizedBox(width: 16),
               ],
-              Icon(
-                CupertinoIcons.clock,
-                size: 14,
-                color: CupertinoColors.secondaryLabel.resolveFrom(context),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                _formatTime(order.createdAt),
-                style: TextStyle(
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('回收金额'),
-              AmountText(amount: order.totalAmount),
-            ],
-          ),
-        ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('回收金额'),
+                AmountText(amount: order.totalAmount),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

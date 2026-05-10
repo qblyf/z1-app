@@ -5,6 +5,7 @@ import '../../api/employee_api.dart';
 import '../../models/employee.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 职员二维码页面
 /// 用于专属导购场景，生成员工专属二维码供顾客扫码

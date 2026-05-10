@@ -1,8 +1,11 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../api/api_client.dart';
+import '../../api/oss_api.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 业务类型数据
 class BusinessType {
@@ -23,13 +26,31 @@ class JournalEntry {
   final String payAccountName;
   final int amount;
   final String? remark;
+  final List<String> attachedFiles; // 附件URL列表
 
   const JournalEntry({
     required this.key,
     required this.payAccountName,
     required this.amount,
     this.remark,
+    this.attachedFiles = const [],
   });
+
+  JournalEntry copyWith({
+    String? key,
+    String? payAccountName,
+    int? amount,
+    String? remark,
+    List<String>? attachedFiles,
+  }) {
+    return JournalEntry(
+      key: key ?? this.key,
+      payAccountName: payAccountName ?? this.payAccountName,
+      amount: amount ?? this.amount,
+      remark: remark ?? this.remark,
+      attachedFiles: attachedFiles ?? this.attachedFiles,
+    );
+  }
 }
 
 final _businessTypesProvider = FutureProvider<List<BusinessType>>((ref) async {
@@ -103,6 +124,14 @@ class _FinancialExpenseCreatePageState
       return;
     }
 
+    // 验证附件：每个款项至少需要一个附件
+    for (final entry in _entries) {
+      if (entry.attachedFiles.isEmpty) {
+        _showToast('请为"${entry.payAccountName}"上传至少一张附件图片');
+        return;
+      }
+    }
+
     // 金额校验：手动输入的申请金额 = 添加的款项应付金额合计值
     final inputAmountFen = (amount * 100).round();
     if (inputAmountFen != _totalAmount) {
@@ -123,6 +152,7 @@ class _FinancialExpenseCreatePageState
           'payAccountName': e.payAccountName,
           'amount': e.amount,
           if (e.remark != null) 'remark': e.remark,
+          'attachedFiles': e.attachedFiles,
         }).toList(),
       });
 
@@ -272,6 +302,18 @@ class _FinancialExpenseCreatePageState
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('新建支出单'),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
@@ -569,6 +611,7 @@ class _EntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasAttachment = entry.attachedFiles.isNotEmpty;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -634,6 +677,32 @@ class _EntryCard extends StatelessWidget {
               ),
             ),
           ],
+          // 附件状态
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(
+                hasAttachment
+                    ? CupertinoIcons.checkmark_circle_fill
+                    : CupertinoIcons.exclamationmark_circle_fill,
+                size: 14,
+                color: hasAttachment
+                    ? const Color(0xFF34C759)
+                    : CupertinoColors.destructiveRed,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                hasAttachment
+                    ? '附件 ${entry.attachedFiles.length} 张'
+                    : '缺少附件（必填）',
+                style: AppText.caption.copyWith(
+                  color: hasAttachment
+                      ? const Color(0xFF34C759)
+                      : CupertinoColors.destructiveRed,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -943,7 +1012,7 @@ class _AmountInputModalState extends State<_AmountInputModal> {
   }
 }
 
-/// 添加款项弹窗
+/// 添加款项弹窗（含附件上传）
 class _AddEntrySheet extends StatefulWidget {
   final void Function(JournalEntry) onAdd;
 
@@ -957,6 +1026,12 @@ class _AddEntrySheetState extends State<_AddEntrySheet> {
   final _nameController = TextEditingController();
   final _amountController = TextEditingController();
   final _remarkController = TextEditingController();
+  final _imagePicker = ImagePicker();
+
+  // 已上传的附件URL
+  final List<String> _uploadedUrls = [];
+  // 上传中的文件路径
+  final List<String> _uploadingPaths = [];
 
   @override
   void dispose() {
@@ -964,6 +1039,72 @@ class _AddEntrySheetState extends State<_AddEntrySheet> {
     _amountController.dispose();
     _remarkController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickAndUploadImage() async {
+    final source = await showCupertinoModalPopup<int>(
+      context: context,
+      builder: (_) => CupertinoActionSheet(
+        title: const Text('选择图片来源'),
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(context, 0),
+            child: const Text('拍照'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(context, 1),
+            child: const Text('相册'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDestructiveAction: true,
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+    if (source == null) return;
+
+    final XFile? image = await _imagePicker.pickImage(
+      source: source == 0 ? ImageSource.camera : ImageSource.gallery,
+      imageQuality: 80,
+      maxWidth: 1920,
+    );
+    if (image == null) return;
+
+    setState(() => _uploadingPaths.add(image.path));
+
+    try {
+      final bytes = await image.readAsBytes();
+      final ext = image.path.split('.').last.toLowerCase();
+      final validExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+      final fileName = validExts.contains(ext)
+          ? '${DateTime.now().millisecondsSinceEpoch}.$ext'
+          : '${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+      final result = await OssApi().upload(
+        fileBytes: bytes,
+        fileName: fileName,
+      );
+
+      if (mounted) {
+        setState(() {
+          _uploadedUrls.add(result.url);
+          _uploadingPaths.remove(image.path);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _uploadingPaths.remove(image.path));
+        _showToast('图片上传失败: $e');
+      }
+    }
+  }
+
+  void _removeAttachment(int index) {
+    setState(() {
+      _uploadedUrls.removeAt(index);
+    });
   }
 
   void _submit() {
@@ -976,6 +1117,10 @@ class _AddEntrySheetState extends State<_AddEntrySheet> {
       _showToast('请输入有效的付款金额');
       return;
     }
+    if (_uploadedUrls.isEmpty) {
+      _showToast('请上传至少一张附件图片');
+      return;
+    }
 
     final entry = JournalEntry(
       key: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -984,6 +1129,7 @@ class _AddEntrySheetState extends State<_AddEntrySheet> {
       remark: _remarkController.text.trim().isEmpty
           ? null
           : _remarkController.text.trim(),
+      attachedFiles: List.from(_uploadedUrls),
     );
     widget.onAdd(entry);
     Navigator.pop(context);
@@ -1008,9 +1154,7 @@ class _AddEntrySheetState extends State<_AddEntrySheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
+      height: MediaQuery.of(context).size.height * 0.85,
       decoration: const BoxDecoration(
         color: CupertinoColors.systemBackground,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -1018,7 +1162,6 @@ class _AddEntrySheetState extends State<_AddEntrySheet> {
       child: SafeArea(
         top: false,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               padding: const EdgeInsets.symmetric(
@@ -1044,62 +1187,242 @@ class _AddEntrySheetState extends State<_AddEntrySheet> {
                   CupertinoButton(
                     padding: EdgeInsets.zero,
                     onPressed: _submit,
-                    child: const Text('添加'),
+                    child: Text(
+                      '添加',
+                      style: TextStyle(
+                        color: _uploadedUrls.isEmpty
+                            ? CupertinoColors.systemGrey
+                            : AppColors.primary,
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text('付款账户',
-                      style: TextStyle(fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 8),
-                  CupertinoTextField(
-                    controller: _nameController,
-                    placeholder: '请输入付款账户名称',
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    decoration: BoxDecoration(
-                      color: CupertinoColors.systemGrey6,
-                      borderRadius: BorderRadius.circular(AppRadius.md),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text('付款账户',
+                        style: TextStyle(fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 8),
+                    CupertinoTextField(
+                      controller: _nameController,
+                      placeholder: '请输入付款账户名称',
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: CupertinoColors.systemGrey6,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
                     ),
+                    const SizedBox(height: AppSpacing.md),
+                    const Text('付款金额',
+                        style: TextStyle(fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 8),
+                    CupertinoTextField(
+                      controller: _amountController,
+                      placeholder: '请输入金额（元）',
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      prefix: const Padding(
+                        padding: EdgeInsets.only(left: 12),
+                        child: Text('¥'),
+                      ),
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: CupertinoColors.systemGrey6,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    const Text('备注（可选）',
+                        style: TextStyle(fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 8),
+                    CupertinoTextField(
+                      controller: _remarkController,
+                      placeholder: '请输入备注信息',
+                      maxLines: 2,
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: CupertinoColors.systemGrey6,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    // 附件区域
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('业务附件（必填）',
+                            style: TextStyle(fontWeight: FontWeight.w500)),
+                        if (_uploadedUrls.isNotEmpty)
+                          Text(
+                            '${_uploadedUrls.length} 张已上传',
+                            style: AppText.caption.copyWith(
+                              color: const Color(0xFF34C759),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      '每笔款项必须上传至少一张附件图片',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: CupertinoColors.destructiveRed,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    // 附件网格
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        // 已上传的附件
+                        ..._uploadedUrls.asMap().entries.map((entry) {
+                          return _AttachmentThumbnail(
+                            url: entry.value,
+                            onRemove: () => _removeAttachment(entry.key),
+                          );
+                        }),
+                        // 上传中的占位
+                        ..._uploadingPaths.map((path) {
+                          return _AttachmentThumbnail(
+                            url: null,
+                            localPath: path,
+                            onRemove: null,
+                          );
+                        }),
+                        // 添加按钮
+                        _AddAttachmentButton(onTap: _pickAndUploadImage),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 附件缩略图
+class _AttachmentThumbnail extends StatelessWidget {
+  final String? url;
+  final String? localPath;
+  final VoidCallback? onRemove;
+
+  const _AttachmentThumbnail({
+    this.url,
+    this.localPath,
+    this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isLoading = url == null && localPath != null;
+    return Container(
+      width: 72,
+      height: 72,
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemGrey5,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: CupertinoColors.systemGrey4,
+          width: 0.5,
+        ),
+      ),
+      child: Stack(
+        children: [
+          if (isLoading)
+            const Center(child: CupertinoActivityIndicator())
+          else if (url != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(7),
+              child: Image.network(
+                url!,
+                width: 72,
+                height: 72,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const Icon(
+                  CupertinoIcons.photo,
+                  color: CupertinoColors.systemGrey,
+                ),
+              ),
+            )
+          else
+            const Center(
+              child: Icon(
+                CupertinoIcons.photo,
+                color: CupertinoColors.systemGrey,
+              ),
+            ),
+          if (onRemove != null && !isLoading)
+            Positioned(
+              top: 2,
+              right: 2,
+              child: GestureDetector(
+                onTap: onRemove,
+                child: Container(
+                  width: 18,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.black.withValues(alpha: 0.6),
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                  const Text('付款金额',
-                      style: TextStyle(fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 8),
-                  CupertinoTextField(
-                    controller: _amountController,
-                    placeholder: '请输入金额（元）',
-                    keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true),
-                    prefix: const Padding(
-                      padding: EdgeInsets.only(left: 12),
-                      child: Text('¥'),
-                    ),
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    decoration: BoxDecoration(
-                      color: CupertinoColors.systemGrey6,
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
+                  child: const Icon(
+                    CupertinoIcons.xmark,
+                    size: 10,
+                    color: CupertinoColors.white,
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                  const Text('备注（可选）',
-                      style: TextStyle(fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 8),
-                  CupertinoTextField(
-                    controller: _remarkController,
-                    placeholder: '请输入备注信息',
-                    maxLines: 2,
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    decoration: BoxDecoration(
-                      color: CupertinoColors.systemGrey6,
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                  ),
-                ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 添加附件按钮
+class _AddAttachmentButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _AddAttachmentButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 72,
+        height: 72,
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: AppColors.primary.withValues(alpha: 0.3),
+            width: 0.5,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              CupertinoIcons.camera_fill,
+              color: AppColors.primary,
+              size: 24,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '添加图片',
+              style: TextStyle(
+                fontSize: 10,
+                color: AppColors.primary,
               ),
             ),
           ],

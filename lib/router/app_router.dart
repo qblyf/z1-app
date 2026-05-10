@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../pages/home_page.dart';
 import '../pages/login_page.dart';
 import '../pages/clerk/member_management_page.dart';
@@ -7,10 +8,15 @@ import '../pages/clerk/member_detail_page.dart';
 import '../pages/clerk/member_experience_edit_page.dart';
 import '../pages/clerk/stock_distribution_page.dart';
 import '../pages/clerk/order_page.dart';
+import '../pages/clerk/clerk_order_page.dart';
 import '../pages/my_calendar/calendar_list_page.dart';
 import '../pages/my_calendar/calendar_detail_page.dart';
 import '../pages/mall_order/order_list_page.dart';
+import '../pages/mall_order/order_info_page.dart';
+import '../pages/mall_order/recycle_order_info_page.dart';
+import '../pages/mall_order/sales_order_list_page.dart';
 import '../pages/salesperson_data/salesperson_page.dart';
+import '../pages/salesperson_data/salesperson_recycle_order_info_page.dart';
 import '../pages/approval/approval_center_page.dart';
 import '../pages/store_retail/entry_page.dart';
 import '../pages/store_retail/home_page.dart';
@@ -23,6 +29,8 @@ import '../pages/store_retail/member_label_management_page.dart';
 import '../pages/store_retail/sales_preference_page.dart';
 import '../pages/store_retail/recycle_order_list_page.dart';
 import '../pages/store_retail/recycle_order_detail_page.dart';
+import '../pages/store_retail/recycle_order_create_page.dart';
+import '../pages/store_retail/giveaway_select_page.dart';
 import '../pages/employee_score/adjustment_page.dart';
 import '../pages/employee_score/distribution_page.dart';
 import '../pages/employee_score/management_page.dart';
@@ -30,6 +38,7 @@ import '../pages/employee_score/apply_page.dart';
 import '../pages/employee_score/employee_score_info_page.dart';
 import '../pages/employee_score/ranking_page.dart';
 import '../pages/employee_score/reward_punishment_details_page.dart';
+import '../pages/employee_score/employee_score_ranking_detail_page.dart';
 import '../pages/cashier_daily_report/list_page.dart';
 import '../pages/cashier_daily_report/detail_page.dart';
 import '../pages/cashier_daily_report/create_page.dart';
@@ -52,6 +61,11 @@ import '../pages/stocktaking/stocktaking_dashboard_page.dart';
 import '../pages/stocktaking/stocktaking_info_page.dart';
 import '../pages/stocktaking/stocktaking_delivery_receipt_page.dart';
 import '../pages/stocktaking/stocktake_page.dart';
+import '../pages/customer_remind/list_page.dart';
+import '../pages/return_visit/list_page.dart';
+import '../pages/return_visit/detail_page.dart';
+import '../pages/palm_recycle/dept_statistics_page.dart';
+import '../pages/palm_recycle/employee_statistics_page.dart';
 import '../pages/product_quotation/product_quotation_page.dart';
 import '../pages/store_inspection/list_page.dart';
 import '../pages/store_inspection/store_inspection_ready_page.dart';
@@ -61,6 +75,8 @@ import '../pages/goods_request/list_page.dart';
 import '../pages/goods_request/create_page.dart';
 import '../pages/task_management/list_page.dart';
 import '../pages/task_management/task_log_detail_page.dart';
+import '../pages/task_management/task_allocation_info_page.dart';
+import '../pages/task_management/task_template_edit_page.dart';
 import '../pages/customer/customer_birthday_list_page.dart';
 import '../pages/mall_activity/list_page.dart';
 import '../pages/passenger_flow/list_page.dart';
@@ -83,6 +99,7 @@ import '../pages/storekeeper_data/analyse_month_page.dart';
 import '../pages/storekeeper_data/developing_task_progress_page.dart';
 import '../pages/storekeeper_data/main_products_employee_page.dart';
 import '../pages/coupon/list_page.dart';
+import '../pages/coupon/batch_issue_page.dart';
 import '../pages/financial_expense/list_page.dart';
 import '../pages/financial_expense/detail_page.dart';
 import '../pages/financial_expense/create_page.dart';
@@ -97,6 +114,7 @@ import '../pages/notice_center/detail_page.dart';
 import '../pages/accounting_voucher/audit_page.dart';
 import '../pages/accounting_voucher/list_page.dart';
 import '../pages/points_redeem_order/list_page.dart';
+import '../pages/points_redeem_order/detail_page.dart';
 import '../pages/flash_sale/flash_sale_order_list_page.dart';
 import '../pages/flash_sale/flash_sale_order_detail_page.dart';
 import '../pages/pre_sale/pre_sale_order_list_page.dart';
@@ -126,11 +144,24 @@ import '../pages/storekeeper_data/seller_sales_ranking_page.dart';
 import '../pages/talent_pool/talent_pool_detail_page.dart';
 import '../pages/zform/zform_pages.dart';
 import '../pages/transfer_order/standard_transfer_draft_page.dart';
+import '../pages/transfer_order/whole_order_stocking_page.dart';
 import '../pages/my_calendar/calendar_send_list_page.dart';
 import '../pages/my_calendar/calendar_allow_check_list_page.dart';
 import '../pages/my_calendar/calendar_expired_list_page.dart';
+import '../pages/my_calendar/calendar_check_list_page.dart';
 import '../pages/goods/goods_tracking_page.dart';
+import '../pages/task_management/task_info_page.dart';
 import '../widgets/main_scaffold.dart';
+
+/// 安全返回方法 - 如果可以 pop 则返回上一页，否则返回首页
+/// 解决全屏页面（非 ShellRoute 内）点击返回按钮时 "There is nothing to pop" 的问题
+void safePop(BuildContext context) {
+  if (Navigator.of(context).canPop()) {
+    context.pop();
+  } else {
+    context.go(Routes.home);
+  }
+}
 
 /// 路由名称
 class Routes {
@@ -138,6 +169,8 @@ class Routes {
   static const String home = '/';
   static const String memberManagement = '/member-management';
   static const String memberDetail = '/member/:id';
+  // 店员开单
+  static const String clerkOrder = '/clerk/order';
   static const String memberExperienceEdit = '/member-experience-edit';
   static const String stockDistribution = '/stock-distribution';
   static const String order = '/order';
@@ -145,14 +178,19 @@ class Routes {
   static const String calendarDetail = '/calendar/:id';
   static const String mallOrderList = '/mall-order';
   static const String mallOrderDetail = '/mall-order/:id';
+  static const String mallOrderInfo = '/mall-order/order-info/:orderNumber';
+  static const String mallOrderRecycleOrderInfo = '/mall-order/recycle-order-info/:orderNumber';
+  static const String mallOrderSalesList = '/mall-order/sales-order-list';
   static const String salespersonData = '/salesperson-data';
   static const String salespersonOrderInfo = '/salesperson-data/order/:number';
+  static const String salespersonRecycleOrderInfo = '/salesperson-data/recycle-order/:number';
   static const String approvalCenter = '/approval';
   static const String approvalDetail = '/approval/:id';
   // 门店零售
   static const String storeRetailEntry = '/store-retail';
   static const String storeRetailHome = '/store-retail/home/:userIdent';
   static const String storeRetailOrder = '/store-retail/order/:userIdent';
+  static const String giveawaySelect = '/store-retail/giveaway-select';
   static const String storeRetailCoupons = '/store-retail/coupons/:userIdent';
   static const String storeRetailMemberInfo = '/store-retail/member-info/:userIdent';
   static const String storeRetailReturns = '/store-retail/returns/:userIdent';
@@ -162,13 +200,14 @@ class Routes {
   // 回收订单
   static const String recycleOrderList = '/store-retail/recycle-orders';
   static const String recycleOrderDetail = '/store-retail/recycle-order/detail/:number';
-  static const String recycleOrderCreate = '/store-retail/recycle-order/create';
+  static const String recycleOrderCreate = '/store-retail/recycle-order/create/:userIdent';
   // 员工积分
   static const String employeeScore = '/employee-score';
   static const String employeeScoreDistribution = '/employee-score/distribution';
   static const String employeeScoreManagement = '/employee-score/management';
   static const String employeeScoreApply = '/employee-score/apply';
   static const String employeeScoreRanking = '/employee-score/ranking';
+  static const String employeeScoreRankingDetail = '/employee-score/ranking-detail';
   static const String employeeScoreInfo = '/employee-score/info/:id';
   static const String rewardPunishmentDetails = '/employee-score/reward-punishment-details';
   // 收银日报
@@ -213,6 +252,9 @@ class Routes {
   // 岗位任务
   static const String taskManagement = '/task-management';
   static const String taskLogDetail = '/task-management/log/:id';
+  static const String taskInfo = '/task-management/task-info/:id';
+  static const String taskAllocationInfo = '/task-management/allocation-info/:id';
+  static const String taskTemplateEdit = '/task-management/template/edit/:id?';
   // 客户生日关怀
   static const String customerBirthday = '/customer/birthday';
   // 商城活动
@@ -245,6 +287,16 @@ class Routes {
   static const String developingTaskProgress = '/storekeeper-data/task-progress-demo';
   // 优惠券
   static const String couponList = '/coupon';
+  static const String couponBatchIssue = '/coupon/batch-issue';
+  // 客户提醒
+  static const String customerRemindList = '/customer-remind';
+  static const String customerRemindDetail = '/customer-remind/detail/:id';
+  // 客户回访
+  static const String returnVisitList = '/return-visit';
+  static const String returnVisitDetail = '/return-visit/detail/:number';
+  // 掌上回收统计
+  static const String palmRecycleDeptStatistics = '/palm-recycle/dept-statistics';
+  static const String palmRecycleEmplStatistics = '/palm-recycle/empl-statistics';
   // 财务支出
   static const String financialExpenseList = '/financial-expense';
   static const String financialExpenseDetail = '/financial-expense/detail/:id';
@@ -266,6 +318,7 @@ class Routes {
   static const String accountingVoucherAudit = '/accounting-voucher/audit/:id';
   // 积分兑换
   static const String pointsRedeemOrderList = '/points-redeem-order';
+  static const String pointsRedeemOrderDetail = '/points-redeem-order/detail/:id';
   // 秒杀订单
   static const String flashSaleOrderList = '/flash-sale/orders';
   static const String flashSaleOrderDetail = '/flash-sale/order/detail/:id';
@@ -315,12 +368,16 @@ class Routes {
   static const String sellerSalesRanking = '/storekeeper-data/seller-sales-ranking';
   // 标品调拨草稿
   static const String standardTransferDraft = '/transfer-order/standard-draft';
+  // 整单备货
+  static const String wholeOrderStocking = '/transfer-order/whole-order-stocking';
   // 行事历 - 抄送列表
   static const String calendarSendList = '/calendar/send-list';
   // 行事历 - 待验收列表
   static const String calendarAllowCheckList = '/calendar/allow-check';
   // 行事历 - 已过期列表
   static const String calendarExpiredList = '/calendar/expired';
+  // 行事历 - 我验收的列表
+  static const String calendarCheckList = '/calendar/check-list';
   // 货品流转追踪
   static const String goodsTracking = '/goods/tracking/:goodsId';
   // 人才池详情
@@ -335,8 +392,20 @@ class Routes {
 final GoRouter appRouter = GoRouter(
   initialLocation: Routes.home,
   redirect: (context, state) async {
-    // 跳过 redirect，避免在登录流程中干扰
-    // 登录页面的 context.go 会处理自己的跳转逻辑
+    // 跳过登录页本身的检查
+    if (state.uri.path == Routes.login) {
+      return null;
+    }
+
+    // 检查是否已登录
+    final prefs = await SharedPreferences.getInstance();
+    final isLoggedIn = prefs.getBool('has_token') ?? false;
+
+    // 如果未登录，跳转到登录页
+    if (!isLoggedIn) {
+      return Routes.login;
+    }
+
     return null;
   },
   routes: [
@@ -392,6 +461,12 @@ final GoRouter appRouter = GoRouter(
           builder: (context, state) => const OrderPage(),
         ),
 
+        // 店员开单
+        GoRoute(
+          path: Routes.clerkOrder,
+          builder: (context, state) => const ClerkOrderPage(),
+        ),
+
         // 行事历
         GoRoute(
           path: Routes.calendar,
@@ -422,6 +497,36 @@ final GoRouter appRouter = GoRouter(
           ],
         ),
 
+        // 商城订单详情（完整版）
+        GoRoute(
+          path: '/mall-order/order-info/:orderNumber',
+          builder: (context, state) {
+            final orderNumber = state.pathParameters['orderNumber'] ?? '';
+            return OrderInfoPage(orderNumber: orderNumber);
+          },
+        ),
+
+        // 商城回收单详情
+        GoRoute(
+          path: '/mall-order/recycle-order-info/:orderNumber',
+          builder: (context, state) {
+            final orderNumber = state.pathParameters['orderNumber'] ?? '';
+            return RecycleOrderInfoPage(orderNumber: orderNumber);
+          },
+        ),
+
+        // 商城销售订单列表
+        GoRoute(
+          path: '/mall-order/sales-order-list',
+          builder: (context, state) => const SalesOrderListPage(),
+        ),
+
+        // 商城回收单列表（复用门店零售的回收单列表）
+        GoRoute(
+          path: '/mall-order/recycle-order-list',
+          builder: (context, state) => const RecycleOrderListPage(),
+        ),
+
         // 销售人员数据
         GoRoute(
           path: Routes.salespersonData,
@@ -432,6 +537,13 @@ final GoRouter appRouter = GoRouter(
               builder: (context, state) {
                 final number = state.pathParameters['number'] ?? '';
                 return SalespersonOrderInfoPage(orderNumber: number);
+              },
+            ),
+            GoRoute(
+              path: 'recycle-order/:number',
+              builder: (context, state) {
+                final number = state.pathParameters['number'] ?? '';
+                return SalespersonRecycleOrderInfoPage(orderNumber: number);
               },
             ),
           ],
@@ -470,7 +582,45 @@ final GoRouter appRouter = GoRouter(
       path: Routes.storeRetailOrder,
       builder: (context, state) {
         final id = int.tryParse(state.pathParameters['userIdent'] ?? '') ?? 0;
-        return SalesOrderPage(userIdent: id);
+        final bookingIdStr = state.uri.queryParameters['appointmentBookingId'];
+        final bookingId = bookingIdStr != null ? int.tryParse(bookingIdStr) : null;
+        final bookingSkuIdStr = state.uri.queryParameters['appointmentBookingSkuID'];
+        final bookingSkuId = bookingSkuIdStr != null ? int.tryParse(bookingSkuIdStr) : null;
+        final redeemIdStr = state.uri.queryParameters['pointsRedeemOrderID'];
+        final redeemId = redeemIdStr != null ? int.tryParse(redeemIdStr) : null;
+        final redeemSkuStr = state.uri.queryParameters['pointsRedeemOrderSkuID'];
+        final redeemSku = redeemSkuStr != null ? int.tryParse(redeemSkuStr) : null;
+        final redeemSvcStr = state.uri.queryParameters['pointsRedeemOrderServiceID'];
+        final redeemSvc = redeemSvcStr != null ? int.tryParse(redeemSvcStr) : null;
+        final preSaleSkuStr = state.uri.queryParameters['preSaleOrderSkuID'];
+        final preSaleSku = preSaleSkuStr != null ? int.tryParse(preSaleSkuStr) : null;
+        final preSaleNumber = state.uri.queryParameters['preSaleOrderNumber'];
+        final preSaleServices = state.uri.queryParameters['preSaleServices'];
+        return SalesOrderPage(
+          userIdent: id,
+          appointmentBookingId: bookingId,
+          appointmentBookingSkuId: bookingSkuId,
+          pointsRedeemOrderId: redeemId,
+          pointsRedeemOrderSkuId: redeemSku,
+          pointsRedeemOrderServiceId: redeemSvc,
+          preSaleOrderSkuId: preSaleSku,
+          preSaleOrderNumber: preSaleNumber,
+          preSaleOrderServices: preSaleServices,
+        );
+      },
+    ),
+    GoRoute(
+      path: Routes.giveawaySelect,
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return GiveawaySelectPage(
+          itemKey: extra?['itemKey'] ?? '',
+          skuId: extra?['skuId'] as int?,
+          serviceId: extra?['serviceId'] as int?,
+          itemId: extra?['itemId'] as int?,
+          itemName: extra?['itemName'] as String?,
+          qty: extra?['qty'] as int? ?? 1,
+        );
       },
     ),
     GoRoute(
@@ -532,7 +682,10 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: Routes.recycleOrderCreate,
-      builder: (context, state) => const RecycleOrderListPage(), // TODO: 创建页
+      builder: (context, state) {
+        final userIdent = int.tryParse(state.pathParameters['userIdent'] ?? '') ?? 0;
+        return RecycleOrderCreatePage(userIdent: userIdent);
+      },
     ),
 
     // 员工积分路由（不在 ShellRoute 内，全屏页面）
@@ -555,6 +708,10 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: Routes.employeeScoreRanking,
       builder: (context, state) => const RankingPage(),
+    ),
+    GoRoute(
+      path: Routes.employeeScoreRankingDetail,
+      builder: (context, state) => const EmployeeScoreRankingDetailPage(),
     ),
     GoRoute(
       path: Routes.employeeScoreInfo,
@@ -745,6 +902,27 @@ final GoRouter appRouter = GoRouter(
         return TaskLogDetailPage(taskLogId: id);
       },
     ),
+    GoRoute(
+      path: Routes.taskInfo,
+      builder: (context, state) {
+        final id = int.tryParse(state.pathParameters['id'] ?? '') ?? 0;
+        return TaskInfoPage(taskId: id);
+      },
+    ),
+    GoRoute(
+      path: Routes.taskAllocationInfo,
+      builder: (context, state) {
+        final id = int.tryParse(state.pathParameters['id'] ?? '') ?? 0;
+        return TaskAllocationInfoPage(allocationId: id);
+      },
+    ),
+    GoRoute(
+      path: Routes.taskTemplateEdit,
+      builder: (context, state) {
+        final id = state.pathParameters['id'];
+        return TaskTemplateEditPage(templateId: id);
+      },
+    ),
     // 客户生日关怀路由
     GoRoute(
       path: Routes.customerBirthday,
@@ -868,6 +1046,39 @@ final GoRouter appRouter = GoRouter(
       path: Routes.couponList,
       builder: (context, state) => const CouponListPage(),
     ),
+    GoRoute(
+      path: Routes.couponBatchIssue,
+      builder: (context, state) => const BatchIssueCouponsPage(),
+    ),
+
+    // 客户提醒路由
+    GoRoute(
+      path: Routes.customerRemindList,
+      builder: (context, state) => const CustomerRemindListPage(),
+    ),
+
+    // 客户回访路由
+    GoRoute(
+      path: Routes.returnVisitList,
+      builder: (context, state) => const ReturnVisitListPage(),
+    ),
+    GoRoute(
+      path: Routes.returnVisitDetail,
+      builder: (context, state) {
+        final number = state.pathParameters['number'] ?? '';
+        return ReturnVisitDetailPage(number: Uri.decodeComponent(number));
+      },
+    ),
+
+    // 掌上回收统计路由
+    GoRoute(
+      path: Routes.palmRecycleDeptStatistics,
+      builder: (context, state) => const PalmRecycleDeptStatisticsPage(),
+    ),
+    GoRoute(
+      path: Routes.palmRecycleEmplStatistics,
+      builder: (context, state) => const PalmRecycleEmplStatisticsPage(),
+    ),
 
     // 财务支出路由
     GoRoute(
@@ -957,6 +1168,13 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: Routes.pointsRedeemOrderList,
       builder: (context, state) => const PointsRedeemOrderListPage(),
+    ),
+    GoRoute(
+      path: Routes.pointsRedeemOrderDetail,
+      builder: (context, state) {
+        final id = int.tryParse(state.pathParameters['id'] ?? '') ?? 0;
+        return PointsRedeemOrderDetailPage(orderId: id);
+      },
     ),
 
     // 秒杀订单路由
@@ -1138,6 +1356,15 @@ final GoRouter appRouter = GoRouter(
       path: Routes.standardTransferDraft,
       builder: (context, state) => const StandardTransferDraftPage(),
     ),
+    // 整单备货路由
+    GoRoute(
+      path: Routes.wholeOrderStocking,
+      builder: (context, state) {
+        final draftIdStr = state.uri.queryParameters['draftId'] ?? '';
+        final draftId = int.tryParse(draftIdStr) ?? 0;
+        return WholeOrderStockingPage(draftId: draftId);
+      },
+    ),
     // 行事历 - 抄送列表路由
     GoRoute(
       path: Routes.calendarSendList,
@@ -1152,6 +1379,11 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: Routes.calendarExpiredList,
       builder: (context, state) => const CalendarExpiredListPage(),
+    ),
+    // 行事历 - 我验收的列表路由
+    GoRoute(
+      path: Routes.calendarCheckList,
+      builder: (context, state) => const CalendarCheckListPage(),
     ),
     // 货品流转追踪路由
     GoRoute(

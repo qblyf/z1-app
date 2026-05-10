@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 import '../../api/stocktaking_api.dart';
 import '../../api/warehouse_api.dart';
 import '../../models/stocktaking.dart';
+import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 盘库-仓库选择页
 /// 对应 PWA /pages/path-d/stocktaking-warehouses.tsx
@@ -20,16 +22,22 @@ class StocktakingWarehousesPage extends ConsumerStatefulWidget {
 class _StocktakingWarehousesPageState extends ConsumerState<StocktakingWarehousesPage> {
   final StocktakingApi _stocktakingApi = StocktakingApi();
   final WarehouseApi _warehouseApi = WarehouseApi();
+  final TextEditingController _remarkController = TextEditingController();
 
   List<WarehouseInfo> _warehouses = [];
   bool _isLoading = true;
-  bool _isSubmitting = false;
   String _searchText = '';
 
   @override
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _remarkController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -74,6 +82,36 @@ class _StocktakingWarehousesPageState extends ConsumerState<StocktakingWarehouse
           CupertinoDialogAction(
             onPressed: () => Navigator.pop(context),
             child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 显示备注输入弹窗，返回用户输入的备注（或 null 如果取消）
+  Future<String?> _showRemarkDialog() async {
+    return showCupertinoDialog<String>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('添加备注'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: CupertinoTextField(
+            controller: _remarkController,
+            placeholder: '请输入备注（选填）',
+            maxLines: 3,
+            minLines: 2,
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(ctx, null),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.pop(ctx, _remarkController.text),
+            child: const Text('确认'),
           ),
         ],
       ),
@@ -137,7 +175,10 @@ class _StocktakingWarehousesPageState extends ConsumerState<StocktakingWarehouse
             CupertinoActionSheetAction(
               onPressed: () async {
                 Navigator.pop(ctx);
-                await _startNewStocktaking(warehouse);
+                _remarkController.clear();
+                final remark = await _showRemarkDialog();
+                if (remark == null) return; // 用户取消
+                await _startNewStocktaking(warehouse, remark: remark);
               },
               child: const Text('开始盘库'),
             ),
@@ -150,24 +191,33 @@ class _StocktakingWarehousesPageState extends ConsumerState<StocktakingWarehouse
     );
   }
 
-  Future<void> _startNewStocktaking(WarehouseInfo warehouse) async {
-    setState(() => _isSubmitting = true);
+  Future<void> _startNewStocktaking(WarehouseInfo warehouse, {String? remark}) async {
     try {
+      // 格式化备注：添加时间 + 操作人 + 内容
+      String? formattedRemark;
+      if (remark != null && remark.isNotEmpty) {
+        final userAsync = ref.read(currentUserProvider);
+        final userName = userAsync.value?.realName ?? '';
+        final now = DateTime.now();
+        final timeStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
+            '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+        formattedRemark = '添加时间:$timeStr; 操作人:$userName; 内容:$remark; \n';
+      }
+
       final id = await _stocktakingApi.addStocktaking(
         planID: widget.planId,
         warehouseID: warehouse.id,
+        remarks: formattedRemark,
       );
       if (mounted) {
         if (id > 0) {
           context.push('/stocktaking/take/$id');
         } else {
           _showToast('创建盘库记录失败');
-          setState(() => _isSubmitting = false);
         }
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isSubmitting = false);
         _showToast('创建盘库记录失败');
       }
     }

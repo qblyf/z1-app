@@ -79,7 +79,7 @@ class CalendarApi {
     return [];
   }
 
-  /// 获取行事历详情
+  /// 获取行事历详情（基础版）
   Future<CalendarTask> getDetail(String id) async {
     final response = await _client.get(
       '/task-log/calendar-detail',
@@ -90,6 +90,20 @@ class CalendarApi {
       return CalendarTask.fromJson(data['res'] as Map<String, dynamic>);
     }
     throw Exception('未找到行事历');
+  }
+
+  /// 获取行事历详情（完整版，含任务日志字段）
+  /// GET /task-log/calendar-detail?taskLogID=X
+  Future<CalendarDetail> getCalendarDetail(int taskLogId) async {
+    final response = await _client.get(
+      '/task-log/calendar-detail',
+      queryParameters: {'taskLogID': taskLogId},
+    );
+    final res = response.data['res'];
+    if (res != null) {
+      return CalendarDetail.fromJson(res as Map<String, dynamic>);
+    }
+    throw Exception('未找到行事历详情');
   }
 
   /// 验收行事历（签到/验收共用）
@@ -206,6 +220,53 @@ class CalendarApi {
     final response = await _client.get('/task-log/my-check-calendar');
     final data = response.data['list'] as List<dynamic>? ?? [];
     return data.map((e) => CalendarSendTask.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// 获取当前用户验收的行事历列表（验收人视图）
+  /// GET /task-log/my-check-calendar（未验收）
+  /// GET /task-log/my-calendar-list currentUserType=checked（已验收）
+  Future<List<CalendarSendTask>> getMyCalendarCheckList({
+    required bool unchecked, // true=未验收列表，false=已验收列表
+    int? statStartAt,
+    int? statEndAt,
+    int limit = 300,
+    int offset = 0,
+  }) async {
+    if (unchecked) {
+      final response = await _client.get('/task-log/my-check-calendar');
+      final data = response.data['list'] as List<dynamic>? ?? [];
+      return data.map((e) => CalendarSendTask.fromJson(e as Map<String, dynamic>)).toList();
+    } else {
+      final response = await _client.get(
+        '/task-log/my-calendar-list',
+        queryParameters: {
+          'currentUserType': 'checked',
+          if (statStartAt != null) 'statStartAt': statStartAt,
+          if (statEndAt != null) 'statEndAt': statEndAt,
+          'limit': limit,
+          'offset': offset,
+        },
+      );
+      final data = response.data['list'] as List<dynamic>? ?? [];
+      return data.map((e) => CalendarSendTask.fromJson(e as Map<String, dynamic>)).toList();
+    }
+  }
+
+  /// 获取当前用户验收的行事历数量统计
+  Future<List<CalendarStatusCount>> getMyCalendarCheckCount({
+    int? statStartAt,
+    int? statEndAt,
+  }) async {
+    final response = await _client.get(
+      '/task-log/my-calendar-count',
+      queryParameters: {
+        'currentUserType': 'checked',
+        if (statStartAt != null) 'statStartAt': statStartAt,
+        if (statEndAt != null) 'statEndAt': statEndAt,
+      },
+    );
+    final data = response.data['res'] as List<dynamic>? ?? [];
+    return data.map((e) => CalendarStatusCount.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   /// 获取已过期的行事历列表

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/payment_detail_api.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 支付记录附件列表页
 /// 对应 PWA /pages/path-d/mall-order/payment-record-attachments-list.tsx

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/notice_center_api.dart';
 import '../../models/notice_center.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 final _noticeFilterProvider = StateProvider<ReceiverType?>((ref) => null);
 

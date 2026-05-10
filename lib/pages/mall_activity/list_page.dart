@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../api/mall_activity_api.dart';
+import '../../router/app_router.dart';
 import '../../theme/app_theme.dart';
 
 /// 商城活动列表页
@@ -55,7 +56,7 @@ class _MallActivityListPageState extends ConsumerState<MallActivityListPage> {
         leading: CupertinoButton(
           padding: EdgeInsets.zero,
           child: const Icon(CupertinoIcons.back),
-          onPressed: () => context.pop(),
+          onPressed: () => safePop(context),
         ),
       ),
       child: SafeArea(

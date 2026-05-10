@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/sales_statistic_api.dart';
 import '../../api/employee_api.dart';
 import '../../widgets/common_widgets.dart';
+import '../../router/app_router.dart';
 
 /// 员工销售排行 API Provider
 final sellerSalesRankingProvider = FutureProvider.family<List<SellerSalesRankingItem>, _RankingParams>(
@@ -96,6 +97,18 @@ class _SellerSalesRankingPageState extends ConsumerState<SellerSalesRankingPage>
 
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('员工排行'),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,

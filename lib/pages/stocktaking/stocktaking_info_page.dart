@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/stocktaking_api.dart';
 import '../../models/stocktaking.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 盘库结果详情页
 /// 对应 PWA /pages/path-d/stocktaking-info.tsx

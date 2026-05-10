@@ -118,6 +118,195 @@ class TaskManagementApi {
     if (list == null) return [];
     return list.map((e) => TaskLogStatisticItem.fromJson(e as Map<String, dynamic>)).toList();
   }
+
+  // ── 任务分配详情/编辑 ─────────────────────────────────────
+
+  /// 获取任务分配详情
+  /// GET /task-allocation/detail
+  Future<TaskAllocationDetail?> getTaskAllocationDetail(int id) async {
+    final res = await _client.get(
+      '/task-allocation/detail',
+      queryParameters: {'ids': id},
+    );
+    final data = res.data['res'] as List<dynamic>?;
+    if (data == null || data.isEmpty) return null;
+    return TaskAllocationDetail.fromJson(data[0] as Map<String, dynamic>);
+  }
+
+  /// 编辑任务分配
+  /// POST /task-allocation/edit
+  Future<bool> editTaskAllocation({
+    required int id,
+    int? startAt,
+    int? endAt,
+    int? duration,
+    String? repeatCycle,
+    List<int>? responsibleRoles,
+    List<int>? responsibleEmployees,
+    int? frequency,
+    List<int>? giveDays,
+    int? repeatNum,
+  }) async {
+    final body = <String, dynamic>{'id': id};
+    if (startAt != null) body['startAt'] = startAt;
+    if (endAt != null) body['endAt'] = endAt;
+    if (duration != null) body['duration'] = duration;
+    if (repeatCycle != null) body['repeatCycle'] = repeatCycle;
+    if (responsibleRoles != null) body['responsibleRoles'] = responsibleRoles;
+    if (responsibleEmployees != null) body['responsibleEmployees'] = responsibleEmployees;
+    if (frequency != null) body['frequency'] = frequency;
+    if (giveDays != null) body['giveDays'] = giveDays;
+    if (repeatNum != null) body['repeatNum'] = repeatNum;
+
+    final res = await _client.post('/task-allocation/edit', data: body);
+    return res.data['res'] == true;
+  }
+
+  // ── 任务模板 ───────────────────────────────────────────────
+
+  /// 任务模板列表
+  /// GET /task-template/list?limit=X&offset=X
+  Future<List<TaskTemplate>> listTaskTemplates({
+    List<int>? labelIDs,
+    List<int>? createdBy,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final queryParams = <String, dynamic>{
+      'limit': limit,
+      'offset': offset,
+    };
+    if (labelIDs != null && labelIDs.isNotEmpty) {
+      queryParams['labelIDs'] = labelIDs;
+    }
+    if (createdBy != null && createdBy.isNotEmpty) {
+      queryParams['createdBy'] = createdBy;
+    }
+    final res = await _client.get('/task-template/list', queryParameters: queryParams);
+    final data = res.data['res'] as List<dynamic>? ?? [];
+    return data.map((e) => TaskTemplate.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// 任务模板总数
+  /// GET /task-template/count
+  Future<int> countTaskTemplates({List<int>? createdBy}) async {
+    final queryParams = <String, dynamic>{};
+    if (createdBy != null && createdBy.isNotEmpty) {
+      queryParams['createdBy'] = createdBy;
+    }
+    final res = await _client.get('/task-template/count', queryParameters: queryParams);
+    return res.data['res'] as int? ?? 0;
+  }
+
+  /// 任务模板详情
+  /// GET /task-template/detail?ids=X
+  Future<TaskTemplateDetail?> getTaskTemplateDetail(String id) async {
+    final res = await _client.get(
+      '/task-template/detail',
+      queryParameters: {'ids': id},
+    );
+    final data = res.data['res'] as List<dynamic>?;
+    if (data == null || data.isEmpty) return null;
+    return TaskTemplateDetail.fromJson(data[0] as Map<String, dynamic>);
+  }
+
+  /// 新增任务模板
+  /// POST /task-template/add
+  Future<bool> addTaskTemplate({
+    required String taskTemplateCate,
+    required String name,
+    required int taskWeight,
+    String? introduction,
+    String? description,
+    List<int>? labelIDs,
+    String? allowCheckType,
+    List<int>? allowCheckEmployees,
+    bool? isNeedSelfEvaluation,
+    List<String>? accessoriesUrls,
+    List<int>? sendUser,
+    int? responsibleStartRemind,
+    int? responsibleEndRemind,
+    int? checkStartRemind,
+    String? selfEvaluationDesc,
+  }) async {
+    final body = <String, dynamic>{
+      'taskTemplateCate': taskTemplateCate,
+      'name': name,
+      'taskWeight': taskWeight,
+    };
+    if (introduction != null) body['introduction'] = introduction;
+    if (description != null) body['description'] = description;
+    if (labelIDs != null && labelIDs.isNotEmpty) body['labelIDs'] = labelIDs;
+    if (allowCheckType != null) body['allowCheckType'] = allowCheckType;
+    if (allowCheckEmployees != null && allowCheckEmployees.isNotEmpty) {
+      body['allowCheckEmployees'] = allowCheckEmployees;
+    }
+    if (isNeedSelfEvaluation != null) body['isNeedSelfEvaluation'] = isNeedSelfEvaluation;
+    if (accessoriesUrls != null && accessoriesUrls.isNotEmpty) {
+      body['accessoriesUrls'] = accessoriesUrls;
+    }
+    if (sendUser != null && sendUser.isNotEmpty) body['sendUser'] = sendUser;
+    if (responsibleStartRemind != null) body['responsibleStartRemind'] = responsibleStartRemind;
+    if (responsibleEndRemind != null) body['responsibleEndRemind'] = responsibleEndRemind;
+    if (checkStartRemind != null) body['checkStartRemind'] = checkStartRemind;
+    if (selfEvaluationDesc != null) body['selfEvaluationDesc'] = selfEvaluationDesc;
+
+    final res = await _client.post('/task-template/add', data: body);
+    return res.data['res'] != null;
+  }
+
+  /// 编辑任务模板
+  /// POST /task-template/edit
+  Future<bool> editTaskTemplate({
+    required String id,
+    String? taskTemplateCate,
+    String? name,
+    String? introduction,
+    String? description,
+    int? taskWeight,
+    List<int>? labelIDs,
+    String? allowCheckType,
+    List<int>? allowCheckEmployees,
+    bool? isNeedSelfEvaluation,
+    List<String>? accessoriesUrls,
+    List<int>? sendUser,
+    String? status,
+    int? responsibleStartRemind,
+    int? responsibleEndRemind,
+    int? checkStartRemind,
+    String? selfEvaluationDesc,
+  }) async {
+    final body = <String, dynamic>{'id': id};
+    if (taskTemplateCate != null) body['taskTemplateCate'] = taskTemplateCate;
+    if (name != null) body['name'] = name;
+    if (introduction != null) body['introduction'] = introduction;
+    if (description != null) body['description'] = description;
+    if (taskWeight != null) body['taskWeight'] = taskWeight;
+    if (labelIDs != null) body['labelIDs'] = labelIDs;
+    if (allowCheckType != null) body['allowCheckType'] = allowCheckType;
+    if (allowCheckEmployees != null) body['allowCheckEmployees'] = allowCheckEmployees;
+    if (isNeedSelfEvaluation != null) body['isNeedSelfEvaluation'] = isNeedSelfEvaluation;
+    if (accessoriesUrls != null) body['accessoriesUrls'] = accessoriesUrls;
+    if (sendUser != null) body['sendUser'] = sendUser;
+    if (status != null) body['status'] = status;
+    if (responsibleStartRemind != null) body['responsibleStartRemind'] = responsibleStartRemind;
+    if (responsibleEndRemind != null) body['responsibleEndRemind'] = responsibleEndRemind;
+    if (checkStartRemind != null) body['checkStartRemind'] = checkStartRemind;
+    if (selfEvaluationDesc != null) body['selfEvaluationDesc'] = selfEvaluationDesc;
+
+    final res = await _client.post('/task-template/edit', data: body);
+    return res.data['res'] == true;
+  }
+
+  /// 停用/启用任务模板
+  /// POST /task-template/invalid
+  Future<bool> invalidateTaskTemplate(String id, {bool disable = true}) async {
+    final res = await _client.post(
+      '/task-template/invalid',
+      data: {'id': id, 'status': disable ? 'disabled' : 'enabled'},
+    );
+    return res.data['res'] == true;
+  }
 }
 
 /// 任务记录统计计数项

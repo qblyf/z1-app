@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/price_adjustment_api.dart';
 import '../../models/price_adjustment.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 final _filterProvider = StateProvider<PriceAdjustmentFilter>((ref) {
   return PriceAdjustmentFilter();
@@ -110,6 +111,18 @@ class _PriceAdjustmentListPageState extends ConsumerState<PriceAdjustmentListPag
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('调价单'),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,

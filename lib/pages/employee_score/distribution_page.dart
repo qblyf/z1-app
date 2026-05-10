@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../providers/employee_score_providers.dart';
 import '../../models/employee_score.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 员工选择器
 class _Employee {
@@ -154,14 +155,32 @@ class _DistributionPageState extends ConsumerState<DistributionPage> {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('积分发放'),
         leading: _step > 0
             ? CupertinoButton(
                 padding: EdgeInsets.zero,
-                child: const Icon(CupertinoIcons.back),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(CupertinoIcons.back, size: 24),
+                    SizedBox(width: 4),
+                    Text('返回', style: TextStyle(fontSize: 17)),
+                  ],
+                ),
                 onPressed: () => setState(() => _step--),
               )
-            : null,
+            : CupertinoButton(
+                padding: EdgeInsets.zero,
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(CupertinoIcons.back, size: 24),
+                    SizedBox(width: 4),
+                    Text('返回', style: TextStyle(fontSize: 17)),
+                  ],
+                ),
+                onPressed: () => safePop(context),
+              ),
+        middle: const Text('积分发放'),
       ),
       child: SafeArea(
         child: Column(

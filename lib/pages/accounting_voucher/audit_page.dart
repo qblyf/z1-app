@@ -7,6 +7,7 @@ import '../../models/user.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../router/app_router.dart';
 
 /// 会计凭证审核详情页 Provider
 final voucherDetailProvider =
@@ -56,7 +57,7 @@ class _AccountingVoucherAuditPageState
 
     try {
       // 获取当前用户标识
-      final user = ref.read(currentUserProvider).valueOrNull;
+      final user = ref.read(currentUserProvider).value;
       _currentUserIdent = user?.userIdent ?? 0;
 
       // 获取凭证详情
@@ -204,6 +205,18 @@ class _AccountingVoucherAuditPageState
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('会计凭证详情'),
         trailing: _isProcessing
             ? const CupertinoActivityIndicator()
@@ -255,9 +268,9 @@ class _AccountingVoucherAuditPageState
               // 凭证编号和状态
               _InfoCard(
                 children: [
-                  _InfoRow('凭证编号', v.displayNumber),
+                  _InfoRow('凭证编号', Text(v.displayNumber)),
                   _InfoRow('凭证状态', _buildStateBadge(v.state)),
-                  _InfoRow('凭证字号', _voucherTypeLabel(v.type)),
+                  _InfoRow('凭证字号', Text(_voucherTypeLabel(v.type))),
                   _InfoRow('制单人', _UserChip(ident: v.creator)),
                   if (v.accountant != null)
                     _InfoRow('经手人', _UserChip(ident: v.accountant!)),
@@ -267,16 +280,16 @@ class _AccountingVoucherAuditPageState
                           v.state == VoucherState.s5))
                     _InfoRow('审核人', _UserChip(ident: v.auditor!)),
                   if (v.cashier != null) _InfoRow('出纳', _UserChip(ident: v.cashier!)),
-                  _InfoRow('凭证日期', _formatDate(v.voucherTime)),
-                  _InfoRow('创建日期', _formatDate(v.createdAt)),
+                  _InfoRow('凭证日期', Text(_formatDate(v.voucherTime))),
+                  _InfoRow('创建日期', Text(_formatDate(v.createdAt))),
                   if (v.auditedAt != null &&
                       v.state != VoucherState.s4)
-                    _InfoRow('审核时间', _formatDate(v.auditedAt)),
+                    _InfoRow('审核时间', Text(_formatDate(v.auditedAt))),
                   _InfoRow(
                     '备注',
-                    v.state == VoucherState.s4
+                    Text(v.state == VoucherState.s4
                         ? '红冲'
-                        : (v.remarks ?? '无'),
+                        : (v.remarks ?? '无')),
                   ),
                 ],
               ),

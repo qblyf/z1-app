@@ -94,7 +94,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
           ),
           onPressed: () {
-            // TODO: 通知中心
+            context.push(Routes.noticeCenter);
           },
         ),
       ),

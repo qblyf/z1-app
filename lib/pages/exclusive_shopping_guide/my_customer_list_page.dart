@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/exclusive_shopping_guide_api.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 专属导购-我的客户列表页
 /// 对应 PWA /pages/path-d/exclusive-shopping-guide/my-customer-list.tsx
@@ -33,7 +34,7 @@ class _MyCustomerListPageState extends ConsumerState<MyCustomerListPage> {
 
     try {
       final userAsync = ref.read(currentUserProvider);
-      final userId = userAsync.value?.id;
+      final userId = userAsync.value?.userIdent;
       if (userId == null) {
         setState(() => _isLoading = false);
         return;
@@ -108,7 +109,7 @@ class _MyCustomerListPageState extends ConsumerState<MyCustomerListPage> {
         leading: CupertinoButton(
           padding: EdgeInsets.zero,
           child: const Icon(CupertinoIcons.back),
-          onPressed: () => context.pop(),
+          onPressed: () => safePop(context),
         ),
       ),
       child: SafeArea(

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' show Divider;
 import '../../api/storekeeper_data_api.dart';
 import '../../models/storekeeper_data.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 final _skuTimeRangeProvider = NotifierProvider<_SkuTimeRangeNotifier, ({int start, int end})>(_SkuTimeRangeNotifier.new);
 
@@ -76,6 +77,18 @@ class _SKURankingPageState extends ConsumerState<SKURankingPage> {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: Text(widget.spuName ?? 'SKU排行'),
         previousPageTitle: 'SPU排行',
       ),

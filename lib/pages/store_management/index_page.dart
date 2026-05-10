@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:go_router/go_router.dart';
+import '../../router/app_router.dart';
 
 /// 门店管理首页
 class StoreManagementIndexPage extends StatelessWidget {

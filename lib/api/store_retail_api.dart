@@ -182,6 +182,70 @@ class StoreRetailApi {
     }
   }
 
+  /// 获取指定 sku/service/item 的可用赠品方案列表
+  /// GET /giveaway-activity/available
+  Future<List<GiveawayActivityInfo>> getGiveawayActivityAvailable({
+    int? skuId,
+    int? serviceId,
+    int? itemId,
+  }) async {
+    final queryParams = <String, dynamic>{};
+    if (skuId != null) queryParams['skuID'] = skuId;
+    if (serviceId != null) queryParams['serviceID'] = serviceId;
+    if (itemId != null) queryParams['itemID'] = itemId;
+    final response = await _client.get(
+      '/giveaway-activity/available',
+      queryParameters: queryParams,
+    );
+    final list = response.data['res'] as List?;
+    if (list is List) {
+      return list.map((e) => GiveawayActivityInfo.fromJson(e as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
+  /// 获取赠品方案详情
+  Future<List<GiveawayActivityInfo>> getGiveawayActivityDetail(List<int> ids) async {
+    if (ids.isEmpty) return [];
+    final response = await _client.get(
+      '/giveaway-activity/detail',
+      queryParameters: {'ids': ids.join(',')},
+    );
+    final list = response.data['res'] as List?;
+    if (list is List) {
+      return list.map((e) => GiveawayActivityInfo.fromJson(e as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
+  /// 获取赠品 SKU 列表详情
+  Future<List<GiveawaySkuInfo>> getGiveawaySkuDetails(List<int> skuIds) async {
+    if (skuIds.isEmpty) return [];
+    final response = await _client.get(
+      '/giveaway-activity/sku-detail',
+      queryParameters: {'ids': skuIds.join(',')},
+    );
+    final list = response.data['res'] as List?;
+    if (list is List) {
+      return list.map((e) => GiveawaySkuInfo.fromJson(e as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
+  /// 获取赠品服务列表详情
+  Future<List<GiveawayServiceInfo>> getGiveawayServiceDetails(List<int> serviceIds) async {
+    if (serviceIds.isEmpty) return [];
+    final response = await _client.get(
+      '/giveaway-activity/service-detail',
+      queryParameters: {'ids': serviceIds.join(',')},
+    );
+    final list = response.data['res'] as List?;
+    if (list is List) {
+      return list.map((e) => GiveawayServiceInfo.fromJson(e as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
   // ── 服务/非标品相关 ────────────────────────────────────────
 
   /// 获取服务详情
@@ -341,6 +405,18 @@ class StoreRetailApi {
     return res is Map<String, dynamic> ? res : data;
   }
 
+  /// 获取订单退货时可用的优惠券列表
+  /// 后端 GET /mall-order-back/coupons-list
+  Future<List<Map<String, dynamic>>> getReturnCoupons(String mallOrderNumber) async {
+    final response = await _client.get(
+      '/mall-order-back/coupons-list',
+      queryParameters: {'mallOrderNumber': mallOrderNumber},
+    );
+    final res = response.data['res'];
+    if (res is List) return res.cast<Map<String, dynamic>>();
+    return [];
+  }
+
   /// 提交退货
   /// 后端 POST /mall-order-back/add
   Future<bool> mallOrderBack({
@@ -434,4 +510,138 @@ class Coupon {
   String get formattedAmount => cent > 0
       ? '¥${(cent / 100).toStringAsFixed(2)}'
       : (amount != null ? '¥${(amount! / 100).toStringAsFixed(2)}' : '免费');
+}
+
+// ── 赠品活动相关模型 ─────────────────────────────────────────
+
+/// 赠品活动信息（用于代下单选择赠品）
+class GiveawayActivityInfo {
+  final int id;
+  /// 活动描述
+  final String desc;
+  /// 赠品文案
+  final String giveawayCopy;
+  /// 状态 on=启用 off=停用
+  final String status;
+  /// SKU赠品 ID 列表
+  final List<int> skuGiveaway;
+  /// 服务赠品 ID 列表
+  final List<int> serviceGiveaway;
+  /// 开始时间（秒）
+  final int startAt;
+  /// 结束时间（秒）
+  final int endAt;
+
+  const GiveawayActivityInfo({
+    required this.id,
+    required this.desc,
+    required this.giveawayCopy,
+    required this.status,
+    required this.skuGiveaway,
+    required this.serviceGiveaway,
+    required this.startAt,
+    required this.endAt,
+  });
+
+  factory GiveawayActivityInfo.fromJson(Map<String, dynamic> json) {
+    return GiveawayActivityInfo(
+      id: json['id'] as int? ?? 0,
+      desc: json['desc'] as String? ?? '',
+      giveawayCopy: json['giveawayCopy'] as String? ?? '',
+      status: json['status'] as String? ?? 'off',
+      skuGiveaway: (json['skuGiveaway'] as List<dynamic>?)?.cast<int>() ?? [],
+      serviceGiveaway: (json['serviceGiveaway'] as List<dynamic>?)?.cast<int>() ?? [],
+      startAt: json['startAt'] as int? ?? 0,
+      endAt: json['endAt'] as int? ?? 0,
+    );
+  }
+
+  bool get isActive => status == 'on';
+}
+
+/// 赠品 SKU 信息
+class GiveawaySkuInfo {
+  final int id;
+  final String name;
+  final String? thumbnail;
+  /// 可售库存
+  final int saleStock;
+
+  const GiveawaySkuInfo({
+    required this.id,
+    required this.name,
+    this.thumbnail,
+    this.saleStock = 0,
+  });
+
+  factory GiveawaySkuInfo.fromJson(Map<String, dynamic> json) {
+    return GiveawaySkuInfo(
+      id: json['id'] as int? ?? 0,
+      name: json['name'] as String? ?? '',
+      thumbnail: json['thumbnail'] as String?,
+      saleStock: json['saleStock'] as int? ?? 0,
+    );
+  }
+}
+
+/// 赠品服务信息
+class GiveawayServiceInfo {
+  final int id;
+  final String name;
+  final String? shortName;
+  final String? thumbnail;
+
+  const GiveawayServiceInfo({
+    required this.id,
+    required this.name,
+    this.shortName,
+    this.thumbnail,
+  });
+
+  factory GiveawayServiceInfo.fromJson(Map<String, dynamic> json) {
+    return GiveawayServiceInfo(
+      id: json['id'] as int? ?? 0,
+      name: json['name'] as String? ?? '',
+      shortName: json['shortName'] as String?,
+      thumbnail: json['thumbnail'] as String?,
+    );
+  }
+}
+
+/// 已选赠品项（挂载在购物车商品/服务/非标品下）
+class SelectedGiveaway {
+  /// 关联的赠品活动ID
+  final int activityId;
+  /// 赠品类型: sku / service
+  final String type;
+  /// 赠品 ID（skuID 或 serviceID）
+  final int giftId;
+  final String? giftName;
+  final String? thumbnail;
+
+  const SelectedGiveaway({
+    required this.activityId,
+    required this.type,
+    required this.giftId,
+    this.giftName,
+    this.thumbnail,
+  });
+
+  factory SelectedGiveaway.fromJson(Map<String, dynamic> json) {
+    return SelectedGiveaway(
+      activityId: json['activityId'] as int? ?? 0,
+      type: json['type'] as String? ?? 'sku',
+      giftId: json['giftId'] as int? ?? 0,
+      giftName: json['giftName'] as String?,
+      thumbnail: json['thumbnail'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'activityId': activityId,
+    'type': type,
+    'giftId': giftId,
+    if (giftName != null) 'giftName': giftName,
+    if (thumbnail != null) 'thumbnail': thumbnail,
+  };
 }

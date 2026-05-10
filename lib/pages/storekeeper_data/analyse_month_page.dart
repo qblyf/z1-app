@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/storekeeper_data_api.dart';
 import '../../models/storekeeper_data.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 月度经营分析页面
 /// 对应 PWA: /storekeeper-data/analyse-month-data
@@ -35,6 +36,18 @@ class _AnalyseMonthPageState extends ConsumerState<AnalyseMonthPage> {
       navigationBar: CupertinoNavigationBar(
         backgroundColor: AppColors.background.withValues(alpha: 0.9),
         border: null,
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('月度经营分析'),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,

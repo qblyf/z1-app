@@ -2,8 +2,11 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../api/flash_sale_order_api.dart';
+import '../../api/order_api.dart';
 import '../../models/flash_sale_order.dart';
+import '../../models/order.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 秒杀订单详情页
 class FlashSaleOrderDetailPage extends ConsumerStatefulWidget {
@@ -22,7 +25,9 @@ class FlashSaleOrderDetailPage extends ConsumerStatefulWidget {
 class _FlashSaleOrderDetailPageState
     extends ConsumerState<FlashSaleOrderDetailPage> {
   final FlashSaleOrderApi _api = FlashSaleOrderApi();
+  final OrderApi _orderApi = OrderApi();
   FlashSaleOrder? _order;
+  MallOrderFullDetail? _mallOrderDetail;
   bool _isLoading = true;
   bool _isOperating = false;
 
@@ -36,12 +41,23 @@ class _FlashSaleOrderDetailPageState
     setState(() => _isLoading = true);
     try {
       final order = await _api.detailById(widget.orderId);
-      if (mounted) {
-        setState(() {
-          _order = order;
-          _isLoading = false;
-        });
+      if (!mounted || order == null) return;
+      // 如果有商城单号，加载商城订单详情（含营业员信息）
+      MallOrderFullDetail? mallDetail;
+      final mallOrderNumber = order.mallOrder ?? '';
+      if (mallOrderNumber.isNotEmpty) {
+        try {
+          mallDetail = await _orderApi.getNewOrderDetailByMallNumber(mallOrderNumber);
+        } catch (_) {
+          // 商城详情加载失败不影响主流程
+        }
       }
+      if (!mounted) return;
+      setState(() {
+        _order = order;
+        _mallOrderDetail = mallDetail;
+        _isLoading = false;
+      });
     } catch (_) {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -123,6 +139,18 @@ class _FlashSaleOrderDetailPageState
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('秒杀订单详情'),
       ),
       child: SafeArea(
@@ -177,6 +205,10 @@ class _FlashSaleOrderDetailPageState
               _InfoRow(label: '创建时间', value: _formatTime(order.createdAt)),
               _InfoRow(label: '订单金额', value: '¥${order.amountYuan}'),
               _InfoRow(label: '处理部门ID', value: '${order.department}'),
+              if (_mallOrderDetail?.mallOrder.sellerIdent != null)
+                _InfoRow(label: '营业员', value: '员工 #${_mallOrderDetail!.mallOrder.sellerIdent}'),
+              if (_mallOrderDetail?.mallOrder.shoppingGuide != null)
+                _InfoRow(label: '专属导购', value: '员工 #${_mallOrderDetail!.mallOrder.shoppingGuide}'),
               if (order.mallOrder != null)
                 _InfoRow(
                   label: '商城处理单号',

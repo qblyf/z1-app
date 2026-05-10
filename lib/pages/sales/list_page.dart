@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/sales_api.dart';
 import '../../models/sales.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 销售查询列表页
 class SalesListPage extends ConsumerStatefulWidget {
@@ -95,6 +96,18 @@ class _SalesListPageState extends ConsumerState<SalesListPage> {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('销售查询'),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,

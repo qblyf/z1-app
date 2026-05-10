@@ -1,9 +1,11 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart' show Divider;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../api/invoice_assistant_api.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 发票助手 - 税号查看页
 class TaxIdViewPage extends ConsumerStatefulWidget {

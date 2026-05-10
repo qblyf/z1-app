@@ -1,4 +1,93 @@
+import 'package:dio/dio.dart';
 import 'api_client.dart';
+
+/// 仓库分类
+class WarehouseCate {
+  final int id;
+  final String name;
+  final String? spell;
+  final int pid;
+  final int order;
+  final List<int> chain;
+
+  const WarehouseCate({
+    required this.id,
+    required this.name,
+    this.spell,
+    this.pid = 0,
+    this.order = 0,
+    this.chain = const [],
+  });
+
+  factory WarehouseCate.fromJson(Map<String, dynamic> json) {
+    return WarehouseCate(
+      id: json['id'] as int? ?? 0,
+      name: json['name'] as String? ?? '',
+      spell: json['spell'] as String?,
+      pid: json['pid'] as int? ?? 0,
+      order: json['order'] as int? ?? 0,
+      chain: (json['chain'] as List<dynamic>?)?.map((e) => e as int).toList() ?? [],
+    );
+  }
+}
+
+/// 仓库基础信息（用于仓库选择器）
+class WarehouseBase {
+  final int id;
+  final String name;
+  final String? number;
+  final String? spell;
+  final int cateId;
+  final List<int> cateIdChain;
+
+  const WarehouseBase({
+    required this.id,
+    required this.name,
+    this.number,
+    this.spell,
+    required this.cateId,
+    this.cateIdChain = const [],
+  });
+
+  factory WarehouseBase.fromJson(Map<String, dynamic> json) {
+    return WarehouseBase(
+      id: json['id'] as int? ?? 0,
+      name: json['name'] as String? ?? '',
+      number: json['number'] as String?,
+      spell: json['spell'] as String?,
+      cateId: json['cateID'] as int? ?? json['cateId'] as int? ?? 0,
+      cateIdChain: (json['cateIDChain'] as List<dynamic>?)
+              ?.map((e) => e as int)
+              .toList() ??
+          [],
+    );
+  }
+}
+
+/// 仓库基础列表结果
+class WarehouseBaseResult {
+  final List<WarehouseBase> warehouses;
+  final List<WarehouseCate> cates;
+
+  const WarehouseBaseResult({
+    this.warehouses = const [],
+    this.cates = const [],
+  });
+
+  factory WarehouseBaseResult.fromJson(Map<String, dynamic> json) {
+    final res = json['res'] as Map<String, dynamic>? ?? json;
+    return WarehouseBaseResult(
+      warehouses: (res['warehouses'] as List<dynamic>?)
+              ?.map((e) => WarehouseBase.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      cates: (res['cates'] as List<dynamic>?)
+              ?.map((e) => WarehouseCate.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+    );
+  }
+}
 
 /// 仓库 API
 /// 对应后端 /warehouse/* 系列接口
@@ -15,7 +104,7 @@ class WarehouseApi {
         .toList();
   }
 
-  /// 根据部门ID获取仓库ID列表
+  /// 根据部门ID获取仓库ID列表（普通）
   /// 后端 GET /warehouse/ids-by-department
   Future<List<int>> getWarehouseIdsByDeptId(int departmentId) async {
     final res = await _client.get(
@@ -25,6 +114,19 @@ class WarehouseApi {
     final data = res.data['res'];
     if (data is List) return data.cast<int>();
     if (data is String) return [];
+    return [];
+  }
+
+  /// 根据部门主仓库获取仓库ID列表
+  /// 对应 PWA getWarehouseIDsByMainDeptID
+  /// 后端 GET /warehouse/get-warehouse-ids-by-main-dept-id
+  Future<List<int>> getWarehouseIdsByMainDeptId(int departmentId) async {
+    final res = await _client.get(
+      '/warehouse/get-warehouse-ids-by-main-dept-id',
+      queryParameters: {'departmentID': departmentId},
+    );
+    final data = res.data['list'];
+    if (data is List) return data.cast<int>();
     return [];
   }
 
@@ -40,6 +142,13 @@ class WarehouseApi {
     return data
         .map((e) => WarehouseInfo.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  /// 获取仓库基础信息列表（仓库选择器用，含分类）
+  /// GET /warehouse/list-base
+  Future<WarehouseBaseResult> listBase() async {
+    final res = await _client.get('/warehouse/list-base');
+    return WarehouseBaseResult.fromJson(res.data as Map<String, dynamic>);
   }
 
   /// 获取仓库列表
@@ -185,7 +294,7 @@ class StockDistributionApi {
       '/product-warehouse/list',
       data: body,
       options: permissionJWT != null
-          ? {'headers': {'Use-Permissions': permissionJWT}}
+          ? Options(headers: {'Use-Permissions': permissionJWT})
           : null,
     );
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/passenger_flow_api.dart';
 import '../../models/passenger_flow.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 门店客流统计列表页
 class PassengerFlowListPage extends ConsumerStatefulWidget {
@@ -89,6 +90,18 @@ class _PassengerFlowListPageState extends ConsumerState<PassengerFlowListPage> {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('客流统计'),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,

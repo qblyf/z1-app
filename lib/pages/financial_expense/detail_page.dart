@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/financial_expense_api.dart';
 import '../../models/financial_expense.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 final _expenseDetailProvider = FutureProvider.autoDispose.family<FinancialExpense?, int>((ref, id) async {
   return financialExpenseApi.fullDetail(id);

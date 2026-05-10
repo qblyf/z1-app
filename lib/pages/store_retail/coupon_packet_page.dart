@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/store_retail_api.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../router/app_router.dart';
 
 /// 会员卡包页 Provider
 final memberCouponListProvider =

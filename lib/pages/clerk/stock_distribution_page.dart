@@ -4,7 +4,6 @@ import '../../api/label_api.dart';
 import '../../api/product_api.dart';
 import '../../api/warehouse_api.dart';
 import '../../models/label.dart';
-import '../../models/product.dart';
 import '../../providers/permission_provider.dart';
 import '../../theme/app_theme.dart';
 import '../clerk/product_select_page.dart';
@@ -24,7 +23,6 @@ class _StockDistributionPageState extends ConsumerState<StockDistributionPage> {
   final StockDistributionApi _stockApi = StockDistributionApi();
   final WarehouseApi _warehouseApi = WarehouseApi();
   final ProductApi _productApi = ProductApi();
-  final LabelApi _labelApi = LabelApi();
 
   // 权限状态
   bool _permLoading = true;
@@ -327,11 +325,7 @@ class _StockDistributionPageState extends ConsumerState<StockDistributionPage> {
   }
 
   void _showProductPicker() async {
-    final result = await Navigator.of(context).push<Product?>(
-      CupertinoPageRoute(
-        builder: (_) => const ProductSelectPage(),
-      ),
-    );
+    final result = await ProductSelectPage.selectProduct(context);
     if (result != null && mounted) {
       setState(() {
         // 使用商品ID作为筛选条件（商品ID就是SPU ID）

@@ -6,6 +6,7 @@ import '../../api/sales_statistic_api.dart';
 import '../../models/employee.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../router/app_router.dart';
 
 /// 员工销售详情页面
 /// 对应 PWA: /storekeeper-data/empl-sales-info

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/purchase_order_api.dart';
 import '../../models/purchase_order.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 采购订单列表页
 class PurchaseOrderListPage extends ConsumerStatefulWidget {
@@ -102,6 +103,18 @@ class _PurchaseOrderListPageState extends ConsumerState<PurchaseOrderListPage> {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('采购订单'),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,

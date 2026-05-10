@@ -170,14 +170,14 @@ class _MallOrderListPageState extends ConsumerState<MallOrderListPage> {
             child: const Text('回收单'),
             onPressed: () {
               Navigator.pop(ctx);
-              _showTip(context, '回收单功能开发中');
+              context.push('/mall-order/recycle-order-list');
             },
           ),
           CupertinoActionSheetAction(
             child: const Text('售后单'),
             onPressed: () {
               Navigator.pop(ctx);
-              _showTip(context, '售后单功能开发中');
+              context.push('/mall-order/sales-order-list');
             },
           ),
         ],
@@ -191,24 +191,8 @@ class _MallOrderListPageState extends ConsumerState<MallOrderListPage> {
   }
 
   void _createRetailOrder(BuildContext context) {
-    // TODO: 跳转到代下单页面
-    _showTip(context, '代下单功能开发中，请从会员详情页进入');
-  }
-
-  void _showTip(BuildContext context, String msg) {
-    showCupertinoDialog(
-      context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('提示'),
-        content: Text(msg),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('确定'),
-            onPressed: () => Navigator.pop(ctx),
-          ),
-        ],
-      ),
-    );
+    // 零售单入口：跳转到销售订单列表页
+    context.push('/mall-order/sales-order-list');
   }
 }
 
@@ -695,15 +679,15 @@ class _MallOrderDetailView extends StatelessWidget {
             ...order.products.map((p) => _buildProductRow(context, p)),
             Container(height: 0.5, color: AppColors.divider),
             // 价格明细
-            _buildPriceRow('商品总额', order.formattedOrderAmount, null),
+            _buildPriceRow(context, '商品总额', order.formattedOrderAmount, null),
             if (order.freightAmount != null && order.freightAmount! > 0)
-              _buildPriceRow('运费', '¥${(order.freightAmount! / 100).toStringAsFixed(2)}', null),
+              _buildPriceRow(context, '运费', '¥${(order.freightAmount! / 100).toStringAsFixed(2)}', null),
             if (order.couponAmount != null && order.couponAmount! > 0)
-              _buildPriceRow('优惠券', '-¥${(order.couponAmount! / 100).toStringAsFixed(2)}', const Color(0xFFFF9500)),
+              _buildPriceRow(context, '优惠券', '-¥${(order.couponAmount! / 100).toStringAsFixed(2)}', const Color(0xFFFF9500)),
             if (order.coinAmount != null && order.coinAmount! > 0)
-              _buildPriceRow('积分抵扣', '-¥${(order.coinAmount! / 100).toStringAsFixed(2)}', const Color(0xFFFF9500)),
+              _buildPriceRow(context, '积分抵扣', '-¥${(order.coinAmount! / 100).toStringAsFixed(2)}', const Color(0xFFFF9500)),
             if (order.discountAmount < order.orderAmount)
-              _buildPriceRow('折扣', '-¥${((order.orderAmount - order.discountAmount) / 100).toStringAsFixed(2)}', const Color(0xFFFF9500)),
+              _buildPriceRow(context, '折扣', '-¥${((order.orderAmount - order.discountAmount) / 100).toStringAsFixed(2)}', const Color(0xFFFF9500)),
             Container(height: 0.5, color: AppColors.divider),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -810,7 +794,8 @@ class _MallOrderDetailView extends StatelessWidget {
     );
   }
 
-  Widget _buildPriceRow(String label, String value, Color? valueColor) {
+  Widget _buildPriceRow(BuildContext context, String label, String value, Color? valueColor) {
+    final resolvedColor = valueColor ?? CupertinoColors.label.resolveFrom(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -820,7 +805,7 @@ class _MallOrderDetailView extends StatelessWidget {
           Text(
             value,
             style: AppText.body.copyWith(
-              color: valueColor ?? CupertinoColors.label.resolveFrom(context),
+              color: resolvedColor,
               fontWeight: FontWeight.w500,
             ),
           ),

@@ -1,4 +1,4 @@
-/// 预约上门状态
+/// 预约上门状态（与 PWA StateSubsidyBookingStatus 对应）
 enum BookingStatus {
   processing('processing', '待处理'),
   accepted('accepted', '已接单'),
@@ -15,6 +15,33 @@ enum BookingStatus {
     return BookingStatus.values.firstWhere(
       (e) => e.value == v,
       orElse: () => BookingStatus.processing,
+    );
+  }
+}
+
+/// 预约上门备注
+class AppointmentRemark {
+  final int employee;
+  final String remark;
+  final int createdAt;
+  final String statusBefore;
+  final String statusCurrent;
+
+  const AppointmentRemark({
+    required this.employee,
+    required this.remark,
+    required this.createdAt,
+    required this.statusBefore,
+    required this.statusCurrent,
+  });
+
+  factory AppointmentRemark.fromJson(Map<String, dynamic> json) {
+    return AppointmentRemark(
+      employee: json['employee'] as int? ?? 0,
+      remark: json['remark'] as String? ?? '',
+      createdAt: json['createdAt'] as int? ?? 0,
+      statusBefore: json['statusBefore'] as String? ?? '',
+      statusCurrent: json['statusCurrent'] as String? ?? '',
     );
   }
 }
@@ -54,10 +81,12 @@ class AppointmentBooking {
   final String? remarks;
   final int client;
   final int? dispatcher;
+  final int? editor;
   final int? handler;
   final BookingStatus status;
   final int? acceptedAt;
   final int? completedAt;
+  final List<AppointmentRemark> appointmentRemarks;
   final int createdAt;
   final int createdBy;
 
@@ -78,10 +107,12 @@ class AppointmentBooking {
     this.remarks,
     required this.client,
     this.dispatcher,
+    this.editor,
     this.handler,
     required this.status,
     this.acceptedAt,
     this.completedAt,
+    this.appointmentRemarks = const [],
     required this.createdAt,
     required this.createdBy,
   });
@@ -109,10 +140,15 @@ class AppointmentBooking {
       remarks: json['remarks'] as String?,
       client: json['client'] as int? ?? 0,
       dispatcher: json['dispatcher'] as int?,
+      editor: json['editor'] as int?,
       handler: json['handler'] as int?,
       status: BookingStatus.fromValue(json['status'] as String?) ?? BookingStatus.processing,
       acceptedAt: json['acceptedAt'] as int?,
       completedAt: json['completedAt'] as int?,
+      appointmentRemarks: (json['appointmentRemarks'] as List?)
+              ?.map((e) => AppointmentRemark.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
       createdAt: json['createdAt'] as int? ?? 0,
       createdBy: json['createdBy'] as int? ?? 0,
     );

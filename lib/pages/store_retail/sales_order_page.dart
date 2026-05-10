@@ -1,13 +1,23 @@
+import 'dart:convert';
+
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart' show Divider;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:go_router/go_router.dart';
 import '../../api/store_retail_api.dart';
 import '../../api/member_api.dart';
+import '../../api/warehouse_api.dart';
+import '../../api/appointment_booking_api.dart';
+import '../../api/product_api.dart';
 import '../../models/user.dart';
 import '../../models/store_retail.dart';
+import '../../models/appointment_booking.dart';
+import '../../models/product.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../router/app_router.dart';
+import '../clerk/select_specification_page.dart';
 
 /// 门店零售代下单页 Provider
 final salesOrderMemberProvider =
@@ -20,6 +30,36 @@ final retailProductSearchProvider =
     FutureProvider.family<List<RetailSkuItem>, String>((ref, keyword) async {
   if (keyword.trim().isEmpty) return [];
   return StoreRetailApi().searchMallProducts(keyword: keyword);
+});
+
+/// 仓库绑定商品 Provider（支持搜索和全量加载）
+/// 当 keyword 为空时返回全量商品列表
+final retailProductsWithStockProvider =
+    FutureProvider.family<List<RetailSkuItem>, ({String keyword, int deptId})>(
+        (ref, params) async {
+  // keyword 为空时调用全量接口
+  final products = await StoreRetailApi().searchMallProducts(
+    keyword: params.keyword,
+  );
+  if (products.isEmpty) return products;
+
+  // 获取当前用户部门的绑定仓库ID列表（对应 PWA getWarehouseIDsByMainDeptID）
+  final warehouseIds = await WarehouseApi()
+      .getWarehouseIdsByMainDeptId(params.deptId);
+  if (warehouseIds.isEmpty) return products;
+
+  // 获取各商品的库存
+  final productIds = products.map((p) => p.skuId).toList();
+  final stockMap = await StoreRetailApi().getStockStats(
+    warehouseIds: warehouseIds,
+    productIds: productIds,
+  );
+
+  // 将库存合并到商品数据中
+  return products.map((p) {
+    final stock = stockMap[p.skuId.toString()] ?? stockMap['${p.skuId}'] ?? 0;
+    return p.copyWith(stock: stock);
+  }).toList();
 });
 
 /// 零售购物车 Provider（StateNotifier）
@@ -122,21 +162,54 @@ class RetailCartNotifier extends StateNotifier<RetailCart> {
   }
 
   void removeProduct(int skuId) {
+    final updatedGiveaways = Map<String, List<CartGiveaway>>.from(state.giveaways);
+    updatedGiveaways.remove('sku-$skuId');
     state = state.copyWith(
       products: state.products.where((p) => p.skuId != skuId).toList(),
+      giveaways: updatedGiveaways,
     );
   }
 
   void removeService(int serviceId) {
+    final updatedGiveaways = Map<String, List<CartGiveaway>>.from(state.giveaways);
+    updatedGiveaways.remove('service-$serviceId');
     state = state.copyWith(
       services: state.services.where((s) => s.serviceId != serviceId).toList(),
+      giveaways: updatedGiveaways,
     );
   }
 
   void removeNonStandard(int itemId) {
+    final updatedGiveaways = Map<String, List<CartGiveaway>>.from(state.giveaways);
+    updatedGiveaways.remove('item-$itemId');
     state = state.copyWith(
       nonStandards: state.nonStandards.where((n) => n.itemId != itemId).toList(),
+      giveaways: updatedGiveaways,
     );
+  }
+
+  /// 设置优惠券
+  void setCoupon(SelectedCoupon? coupon) {
+    state = state.copyWith(selectedCoupon: coupon, clearCoupon: coupon == null);
+  }
+
+  /// 添加赠品
+  void addGiveaway(String itemKey, CartGiveaway giveaway) {
+    final updated = Map<String, List<CartGiveaway>>.from(state.giveaways);
+    final existing = updated[itemKey] ?? [];
+    if (!existing.any((g) => g.giftId == giveaway.giftId)) {
+      updated[itemKey] = [...existing, giveaway];
+    }
+    state = state.copyWith(giveaways: updated);
+  }
+
+  /// 移除赠品
+  void removeGiveaway(String itemKey, int giftId) {
+    final updated = Map<String, List<CartGiveaway>>.from(state.giveaways);
+    final existing = updated[itemKey] ?? [];
+    updated[itemKey] = existing.where((g) => g.giftId != giftId).toList();
+    if (updated[itemKey]!.isEmpty) updated.remove(itemKey);
+    state = state.copyWith(giveaways: updated);
   }
 
   void clear() {
@@ -147,8 +220,35 @@ class RetailCartNotifier extends StateNotifier<RetailCart> {
 /// 代下单页面
 class SalesOrderPage extends ConsumerStatefulWidget {
   final int userIdent;
+  /// 从预约单带入商品时传入的预约单ID
+  final int? appointmentBookingId;
+  /// 从预约单直接带入的SKU ID（优先使用，跳过详情接口）
+  final int? appointmentBookingSkuId;
+  /// 从积分兑换单带入时传入的兑换单ID
+  final int? pointsRedeemOrderId;
+  /// 从积分兑换单带入时传入的商品SKU ID
+  final int? pointsRedeemOrderSkuId;
+  /// 从积分兑换单带入时传入的服务ID
+  final int? pointsRedeemOrderServiceId;
+  /// 从预售订单带入时的商品SKU ID
+  final int? preSaleOrderSkuId;
+  /// 从预售订单带入时的订单编号
+  final String? preSaleOrderNumber;
+  /// 从预售订单带入时的捆绑服务ID列表（JSON字符串）
+  final String? preSaleOrderServices;
 
-  const SalesOrderPage({super.key, required this.userIdent});
+  const SalesOrderPage({
+    super.key,
+    required this.userIdent,
+    this.appointmentBookingId,
+    this.appointmentBookingSkuId,
+    this.pointsRedeemOrderId,
+    this.pointsRedeemOrderSkuId,
+    this.pointsRedeemOrderServiceId,
+    this.preSaleOrderSkuId,
+    this.preSaleOrderNumber,
+    this.preSaleOrderServices,
+  });
 
   @override
   ConsumerState<SalesOrderPage> createState() => _SalesOrderPageState();
@@ -156,6 +256,111 @@ class SalesOrderPage extends ConsumerStatefulWidget {
 
 class _SalesOrderPageState extends ConsumerState<SalesOrderPage> {
   int _currentTab = 0; // 0=商品, 1=服务, 2=非标
+  bool _isLoadingBooking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadExternalOrder();
+    });
+  }
+
+  Future<void> _loadExternalOrder() async {
+    // 从预约单预填充（优先使用直接传入的SKU ID，跳过详情接口）
+    if (widget.appointmentBookingSkuId != null) {
+      await _loadSkuForRedeem(widget.appointmentBookingSkuId!);
+    } else if (widget.appointmentBookingId != null) {
+      await _loadAppointmentBooking(widget.appointmentBookingId!);
+    }
+    // 从积分兑换单预填充
+    if (widget.pointsRedeemOrderSkuId != null) {
+      await _loadSkuForRedeem(widget.pointsRedeemOrderSkuId!);
+    }
+    // 从预售订单预填充（商品SKU + 捆绑服务）
+    if (widget.preSaleOrderSkuId != null) {
+      await _loadPreSaleOrder(
+        widget.preSaleOrderSkuId!,
+        widget.preSaleOrderServices,
+      );
+    }
+  }
+
+  /// 从预售订单预填充：商品SKU + 捆绑服务
+  Future<void> _loadPreSaleOrder(int skuId, String? servicesJson) async {
+    setState(() => _isLoadingBooking = true);
+    try {
+      final storeApi = StoreRetailApi();
+      // 加载商品 SKU
+      final skus = await storeApi.getSkuDetails([skuId]);
+      if (skus.isNotEmpty && mounted) {
+        ref
+            .read(retailCartProvider(widget.userIdent).notifier)
+            .addProduct(skus.first.copyWith(qty: 1));
+      }
+      // 加载捆绑服务
+      if (servicesJson != null && servicesJson.isNotEmpty) {
+        try {
+          final serviceIds = (servicesJson.startsWith('[')
+                  ? (jsonDecode(servicesJson) as List).cast<int>()
+                  : <int>[])
+              .toList();
+          if (serviceIds.isNotEmpty) {
+            final services = await storeApi.getServiceDetails(serviceIds);
+            for (final svc in services) {
+              ref
+                  .read(retailCartProvider(widget.userIdent).notifier)
+                  .addService(svc);
+            }
+          }
+        } catch (_) {}
+      }
+    } catch (_) {
+      // 忽略错误
+    } finally {
+      if (mounted) setState(() => _isLoadingBooking = false);
+    }
+  }
+
+  Future<void> _loadAppointmentBooking(int bookingId) async {
+    setState(() => _isLoadingBooking = true);
+    try {
+      final api = AppointmentBookingApi();
+      final booking = await api.detail(bookingId);
+      if (booking == null || !mounted) return;
+
+      if (booking.sku > 0) {
+        final storeApi = StoreRetailApi();
+        final skus = await storeApi.getSkuDetails([booking.sku]);
+        if (skus.isNotEmpty && mounted) {
+          ref
+              .read(retailCartProvider(widget.userIdent).notifier)
+              .addProduct(skus.first.copyWith(qty: 1));
+        }
+      }
+    } catch (_) {
+      // 忽略错误
+    } finally {
+      if (mounted) setState(() => _isLoadingBooking = false);
+    }
+  }
+
+  Future<void> _loadSkuForRedeem(int skuId) async {
+    setState(() => _isLoadingBooking = true);
+    try {
+      final storeApi = StoreRetailApi();
+      final skus = await storeApi.getSkuDetails([skuId]);
+      if (skus.isNotEmpty && mounted) {
+        ref
+            .read(retailCartProvider(widget.userIdent).notifier)
+            .addProduct(skus.first.copyWith(qty: 1));
+      }
+    } catch (_) {
+      // 忽略错误
+    } finally {
+      if (mounted) setState(() => _isLoadingBooking = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -395,33 +600,64 @@ class _ProductTabState extends ConsumerState<_ProductTab> {
   @override
   Widget build(BuildContext context) {
     final keyword = _searchController.text.trim();
+    final memberAsync = ref.watch(salesOrderMemberProvider(widget.userIdent));
 
     return Column(
       children: [
-        // 搜索栏
+        // 搜索栏 + 规格选品按钮
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: CupertinoSearchTextField(
-            controller: _searchController,
-            placeholder: '搜索商品名称/编码',
-            onChanged: (_) => setState(() {}),
-            onSubmitted: (_) => setState(() {}),
+          child: Row(
+            children: [
+              Expanded(
+                child: CupertinoSearchTextField(
+                  controller: _searchController,
+                  placeholder: '搜索商品名称/编码',
+                  onChanged: (_) => setState(() {}),
+                  onSubmitted: (_) => setState(() {}),
+                ),
+              ),
+              const SizedBox(width: 8),
+              CupertinoButton(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                minSize: 0,
+                onPressed: _openSpecSelectSearch,
+                child: Row(
+                  children: [
+                    const Icon(CupertinoIcons.slider_horizontal_3, size: 16, color: AppColors.primary),
+                    const SizedBox(width: 4),
+                    const Text('规格选品', style: TextStyle(fontSize: 13, color: AppColors.primary, fontWeight: FontWeight.w500)),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
 
         // 商品列表
         Expanded(
-          child: keyword.isEmpty
-              ? _buildCategoryProducts()
-              : _buildSearchResults(keyword),
+          child: memberAsync.when(
+            data: (member) {
+              final deptId = member.deptId ?? 0;
+              return keyword.isEmpty
+                  ? _buildCategoryProducts(deptId)
+                  : _buildSearchResults(keyword, deptId);
+            },
+            loading: () => const LoadingWidget(message: '加载中...'),
+            error: (e, _) => AppErrorWidget(message: '获取会员信息失败: $e'),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildCategoryProducts() {
-    // 默认展示所有商品（按分类）
-    final productsAsync = ref.watch(retailProductSearchProvider(''));
+  Widget _buildCategoryProducts(int deptId) {
+    // 默认展示所有商品（按分类），带仓库库存
+    final productsAsync = ref.watch(
+      retailProductsWithStockProvider((keyword: '', deptId: deptId)),
+    );
     return productsAsync.when(
       data: (products) => products.isEmpty
           ? const EmptyWidget(
@@ -434,8 +670,10 @@ class _ProductTabState extends ConsumerState<_ProductTab> {
     );
   }
 
-  Widget _buildSearchResults(String keyword) {
-    final searchAsync = ref.watch(retailProductSearchProvider(keyword));
+  Widget _buildSearchResults(String keyword, int deptId) {
+    final searchAsync = ref.watch(
+      retailProductsWithStockProvider((keyword: keyword, deptId: deptId)),
+    );
     return searchAsync.when(
       data: (products) => products.isEmpty
           ? EmptyWidget(
@@ -546,6 +784,160 @@ class _ProductTabState extends ConsumerState<_ProductTab> {
       ),
     );
   }
+
+  /// 打开规格选品搜索 → 规格选择页 → 加入购物车
+  /// 对标 PWA SelectSpecification 组件完整流程
+  Future<void> _openSpecSelectSearch() async {
+    // 弹出商品搜索对话框
+    final result = await showCupertinoModalPopup<(int spuId, String name)?>(
+      context: context,
+      builder: (ctx) => _SpecProductSearchSheet(
+        onSelect: (spuId, name) => Navigator.pop(ctx, (spuId, name)),
+      ),
+    );
+
+    if (result == null || !mounted) return;
+    final (spuId, _) = result;
+
+    // 打开规格选择页
+    final specResult = await SelectSpecificationPage.push(context, spuID: spuId);
+    if (specResult == null || !mounted) return;
+
+    // 转换并加入购物车
+    // MallSkuInfo → RetailSkuItem
+    final skuItem = RetailSkuItem(
+      skuId: specResult.skuInfo.id,
+      spuId: specResult.spuInfo.spuID,
+      name: specResult.skuInfo.name,
+      qty: specResult.quantity,
+      discountPrice: specResult.skuInfo.price ?? 0,
+      skuPrice: specResult.skuInfo.listPrice ?? (specResult.skuInfo.price ?? 0),
+      thumbnail: specResult.skuInfo.thumbnail,
+      stock: specResult.skuInfo.stock,
+      services: specResult.services
+          .map((s) => RetailServiceItem(
+                serviceId: s.id,
+                name: s.shortName,
+                shortName: s.shortName,
+                price: s.price,
+              ))
+          .toList(),
+    );
+
+    ref.read(retailCartProvider(widget.userIdent).notifier).addProduct(skuItem);
+  }
+}
+
+/// 规格选品 - 商品搜索底部弹出页
+class _SpecProductSearchSheet extends StatefulWidget {
+  final void Function(int spuId, String name) onSelect;
+
+  const _SpecProductSearchSheet({required this.onSelect});
+
+  @override
+  State<_SpecProductSearchSheet> createState() => _SpecProductSearchSheetState();
+}
+
+class _SpecProductSearchSheetState extends State<_SpecProductSearchSheet> {
+  final _controller = TextEditingController();
+  final _api = ProductApi();
+  List<SpuSearchResult> _results = [];
+  bool _loading = false;
+
+  Future<void> _search(String keyword) async {
+    if (keyword.trim().isEmpty) {
+      setState(() => _results = []);
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      final results = await _api.searchSpu(keyword: keyword);
+      if (mounted) setState(() => _results = results);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemBackground.resolveFrom(context),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            // 拖动条
+            Container(
+              margin: const EdgeInsets.only(top: 8),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: CupertinoColors.systemGrey4,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: CupertinoSearchTextField(
+                controller: _controller,
+                placeholder: '搜索商品名称',
+                autofocus: true,
+                onChanged: _search,
+                onSubmitted: _search,
+              ),
+            ),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CupertinoActivityIndicator())
+                  : _results.isEmpty
+                      ? Center(
+                          child: Text(
+                            _controller.text.isEmpty ? '输入关键词搜索商品' : '未找到商品',
+                            style: AppText.body.copyWith(color: CupertinoColors.secondaryLabel),
+                          ),
+                        )
+                      : ListView.separated(
+                          itemCount: _results.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (context, index) {
+                            final item = _results[index];
+                            return ListTile(
+                              leading: Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: CupertinoColors.systemGrey5,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: item.mainImage != null
+                                    ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Image.network(item.mainImage!, fit: BoxFit.cover),
+                                      )
+                                    : const Icon(CupertinoIcons.cube_box, color: CupertinoColors.systemGrey),
+                              ),
+                              title: Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                              subtitle: item.shortName != null ? Text(item.shortName!, style: AppText.caption) : null,
+                              trailing: const Icon(CupertinoIcons.chevron_right, size: 16, color: CupertinoColors.systemGrey3),
+                              onTap: () => widget.onSelect(item.id, item.name),
+                            );
+                          },
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _ProductGridCard extends StatelessWidget {
@@ -610,18 +1002,38 @@ class _ProductGridCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Text(
-                        product.formattedPrice,
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              product.formattedPrice,
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              product.stock > 0
+                                  ? '库存：${product.stock}'
+                                  : '库存不足',
+                              style: TextStyle(
+                                color: product.stock > 0
+                                    ? CupertinoColors.systemGrey
+                                    : CupertinoColors.destructiveRed,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const Spacer(),
                       Icon(
                         CupertinoIcons.add_circled,
-                        color: AppColors.primary,
+                        color: product.stock > 0
+                            ? AppColors.primary
+                            : CupertinoColors.systemGrey3,
                         size: 24,
                       ),
                     ],
@@ -1194,9 +1606,44 @@ class _BottomBarState extends ConsumerState<_BottomBar> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (widget.cart.selectedCoupon != null)
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: CupertinoColors.activeOrange.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '已选券: ${widget.cart.selectedCoupon!.title}',
+                                style: TextStyle(
+                                  color: CupertinoColors.activeOrange,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            GestureDetector(
+                              onTap: () => ref.read(retailCartProvider(widget.userIdent).notifier).setCoupon(null),
+                              child: const Icon(CupertinoIcons.xmark_circle_fill, size: 14, color: CupertinoColors.systemGrey3),
+                            ),
+                          ],
+                        ),
+                      if (widget.cart.selectedCoupon != null)
+                        Text(
+                          widget.cart.formattedCouponDiscount,
+                          style: const TextStyle(
+                            color: CupertinoColors.destructiveRed,
+                            fontSize: 12,
+                            decoration: TextDecoration.lineThrough,
+                          ),
+                        ),
                       Text('合计', style: AppText.caption),
                       Text(
-                        widget.cart.formattedTotal,
+                        widget.cart.selectedCoupon != null
+                            ? widget.cart.formattedPayable
+                            : widget.cart.formattedTotal,
                         style: TextStyle(
                           color: AppColors.primary,
                           fontSize: 22,
@@ -1206,6 +1653,25 @@ class _BottomBarState extends ConsumerState<_BottomBar> {
                     ],
                   ),
                   const Spacer(),
+                  // 领券中心按钮
+                  CupertinoButton(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    color: CupertinoColors.activeOrange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(16),
+                    onPressed: () => _showCouponCenter(context),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(CupertinoIcons.tag_fill, size: 14, color: CupertinoColors.activeOrange),
+                        const SizedBox(width: 4),
+                        Text(
+                          widget.cart.selectedCoupon != null ? '换券' : '领券',
+                          style: TextStyle(color: CupertinoColors.activeOrange, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   CupertinoButton.filled(
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
                     onPressed: _isSubmitting ? null : () => _handleSubmit(context),
@@ -1230,44 +1696,162 @@ class _BottomBarState extends ConsumerState<_BottomBar> {
       child: ListView(
         shrinkWrap: true,
         children: [
-          ...widget.cart.products.map((p) => _CartItemRow(
-                icon: CupertinoIcons.cube_box,
-                color: AppColors.primary,
-                title: p.name,
-                qty: p.qty,
-                price: p.formattedPrice,
-                onQtyChange: (v) => ref
-                    .read(retailCartProvider(uid).notifier)
-                    .updateProductQty(p.skuId, v),
-                onRemove: () => ref
-                    .read(retailCartProvider(uid).notifier)
-                    .removeProduct(p.skuId),
-              )),
-          ...widget.cart.services.map((s) => _CartItemRow(
-                icon: CupertinoIcons.wrench,
-                color: const Color(0xFF5856D6),
-                title: s.name,
-                qty: s.qty,
-                price: s.formattedPrice,
-                onQtyChange: (v) => ref
-                    .read(retailCartProvider(uid).notifier)
-                    .updateServiceQty(s.serviceId, v),
-                onRemove: () => ref
-                    .read(retailCartProvider(uid).notifier)
-                    .removeService(s.serviceId),
-              )),
-          ...widget.cart.nonStandards.map((n) => _CartItemRow(
-                icon: CupertinoIcons.cube,
-                color: const Color(0xFFFF9500),
-                title: n.name,
-                qty: n.qty,
-                price: n.formattedPrice,
-                onRemove: () => ref
-                    .read(retailCartProvider(uid).notifier)
-                    .removeNonStandard(n.itemId),
-              )),
+          ...widget.cart.products.map((p) {
+            final itemKey = 'sku-${p.skuId}';
+            final giveaways = widget.cart.giveaways[itemKey] ?? [];
+            final hasGiveaways = giveaways.isNotEmpty;
+            return Column(
+              children: [
+                _CartItemRow(
+                  icon: CupertinoIcons.cube_box,
+                  color: AppColors.primary,
+                  title: p.name,
+                  qty: p.qty,
+                  price: p.formattedPrice,
+                  onQtyChange: (v) => ref
+                      .read(retailCartProvider(uid).notifier)
+                      .updateProductQty(p.skuId, v),
+                  onRemove: () => ref
+                      .read(retailCartProvider(uid).notifier)
+                      .removeProduct(p.skuId),
+                  onGiveawayTap: p.isHasGiveawaysActivity
+                      ? () => _showGiveawaySelect(context, itemKey, skuId: p.skuId, itemName: p.name, qty: p.qty)
+                      : null,
+                  hasGiveaways: hasGiveaways,
+                  giveawayCount: giveaways.length,
+                ),
+                if (hasGiveaways)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 26, bottom: 4),
+                    child: Row(
+                      children: giveaways.map((g) => Container(
+                        margin: const EdgeInsets.only(right: 6, top: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: CupertinoColors.activeGreen.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: CupertinoColors.activeGreen.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(CupertinoIcons.gift, size: 10, color: CupertinoColors.activeGreen),
+                            const SizedBox(width: 4),
+                            Text(
+                              g.giftName ?? '赠品',
+                              style: const TextStyle(fontSize: 10, color: CupertinoColors.activeGreen),
+                            ),
+                            const SizedBox(width: 4),
+                            GestureDetector(
+                              onTap: () => ref.read(retailCartProvider(uid).notifier).removeGiveaway(itemKey, g.giftId),
+                              child: const Icon(CupertinoIcons.xmark_circle, size: 12, color: CupertinoColors.activeGreen),
+                            ),
+                          ],
+                        ),
+                      )).toList(),
+                    ),
+                  ),
+              ],
+            );
+          }),
+          ...widget.cart.services.map((s) {
+            final itemKey = 'service-${s.serviceId}';
+            final giveaways = widget.cart.giveaways[itemKey] ?? [];
+            final hasGiveaways = giveaways.isNotEmpty;
+            return Column(
+              children: [
+                _CartItemRow(
+                  icon: CupertinoIcons.wrench,
+                  color: const Color(0xFF5856D6),
+                  title: s.name,
+                  qty: s.qty,
+                  price: s.formattedPrice,
+                  onQtyChange: (v) => ref
+                      .read(retailCartProvider(uid).notifier)
+                      .updateServiceQty(s.serviceId, v),
+                  onRemove: () => ref
+                      .read(retailCartProvider(uid).notifier)
+                      .removeService(s.serviceId),
+                  onGiveawayTap: s.isHasGiveawaysActivity
+                      ? () => _showGiveawaySelect(context, itemKey, serviceId: s.serviceId, itemName: s.name, qty: s.qty)
+                      : null,
+                  hasGiveaways: hasGiveaways,
+                  giveawayCount: giveaways.length,
+                ),
+              ],
+            );
+          }),
+          ...widget.cart.nonStandards.map((n) {
+            return Column(
+              children: [
+                _CartItemRow(
+                  icon: CupertinoIcons.cube,
+                  color: const Color(0xFFFF9500),
+                  title: n.name,
+                  qty: n.qty,
+                  price: n.formattedPrice,
+                  onRemove: () => ref
+                      .read(retailCartProvider(uid).notifier)
+                      .removeNonStandard(n.itemId),
+                ),
+              ],
+            );
+          }),
           const SizedBox(height: 8),
         ],
+      ),
+    );
+  }
+
+  Future<void> _showGiveawaySelect(
+    BuildContext context,
+    String itemKey, {
+    int? skuId,
+    int? serviceId,
+    int? itemId,
+    String? itemName,
+    int qty = 1,
+  }) async {
+    final result = await context.push<List<CartGiveaway>>(
+      '/store-retail/giveaway-select',
+      extra: {
+        'itemKey': itemKey,
+        'skuId': skuId,
+        'serviceId': serviceId,
+        'itemId': itemId,
+        'itemName': itemName,
+        'qty': qty,
+      },
+    );
+    if (result != null && result.isNotEmpty && mounted) {
+      for (final g in result) {
+        ref.read(retailCartProvider(widget.userIdent).notifier).addGiveaway(itemKey, g);
+      }
+    }
+  }
+
+  Future<void> _showCouponCenter(BuildContext context) async {
+    final api = StoreRetailApi();
+    final coupons = await api.getMemberAvailableCoupons(
+      userIdent: widget.userIdent,
+      minOrderAmount: widget.cart.totalAmount,
+    );
+
+    if (!mounted) return;
+    showCupertinoModalPopup(
+      context: context,
+      builder: (ctx) => _CouponSelectSheet(
+        coupons: coupons,
+        selectedCoupon: widget.cart.selectedCoupon,
+        orderAmount: widget.cart.totalAmount,
+        onSelect: (coupon) {
+          ref.read(retailCartProvider(widget.userIdent).notifier).setCoupon(coupon);
+          Navigator.pop(ctx);
+        },
+        onClear: () {
+          ref.read(retailCartProvider(widget.userIdent).notifier).setCoupon(null);
+          Navigator.pop(ctx);
+        },
       ),
     );
   }
@@ -1282,6 +1866,13 @@ class _BottomBarState extends ConsumerState<_BottomBar> {
           children: [
             const SizedBox(height: 8),
             Text('订单金额: ${widget.cart.formattedTotal}'),
+            if (widget.cart.selectedCoupon != null)
+              Text(
+                '优惠: ${widget.cart.formattedCouponDiscount}',
+                style: const TextStyle(color: CupertinoColors.destructiveRed),
+              ),
+            if (widget.cart.selectedCoupon != null)
+              Text('实付: ${widget.cart.formattedPayable}'),
             const SizedBox(height: 4),
             CupertinoTextField(
               controller: _remarkController,
@@ -1318,6 +1909,9 @@ class _BottomBarState extends ConsumerState<_BottomBar> {
         products: widget.cart.toOrderProducts(),
         remark: _remarkController.text.trim().isNotEmpty
             ? _remarkController.text.trim()
+            : null,
+        couponIds: widget.cart.selectedCoupon != null
+            ? [widget.cart.selectedCoupon!.id]
             : null,
       );
 
@@ -1400,6 +1994,9 @@ class _CartItemRow extends StatelessWidget {
   final String price;
   final ValueChanged<int>? onQtyChange;
   final VoidCallback onRemove;
+  final VoidCallback? onGiveawayTap;
+  final bool hasGiveaways;
+  final int giveawayCount;
 
   const _CartItemRow({
     required this.icon,
@@ -1409,6 +2006,9 @@ class _CartItemRow extends StatelessWidget {
     required this.price,
     this.onQtyChange,
     required this.onRemove,
+    this.onGiveawayTap,
+    this.hasGiveaways = false,
+    this.giveawayCount = 0,
   });
 
   @override
@@ -1427,6 +2027,39 @@ class _CartItemRow extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          // 赠品按钮
+          if (onGiveawayTap != null)
+            GestureDetector(
+              onTap: onGiveawayTap,
+              child: Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: hasGiveaways
+                      ? CupertinoColors.activeGreen.withValues(alpha: 0.1)
+                      : CupertinoColors.systemGrey5,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      CupertinoIcons.gift,
+                      size: 12,
+                      color: hasGiveaways ? CupertinoColors.activeGreen : CupertinoColors.systemGrey,
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      hasGiveaways ? '已选$giveawayCount' : '赠品',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: hasGiveaways ? CupertinoColors.activeGreen : CupertinoColors.systemGrey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           if (onQtyChange != null) ...[
             GestureDetector(
               onTap: () => onQtyChange!(qty - 1),
@@ -1450,6 +2083,206 @@ class _CartItemRow extends StatelessWidget {
             child: Icon(CupertinoIcons.trash, size: 18, color: CupertinoColors.destructiveRed),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 优惠券选择底部弹窗
+class _CouponSelectSheet extends StatefulWidget {
+  final List<Coupon> coupons;
+  final SelectedCoupon? selectedCoupon;
+  final int orderAmount; // 分
+  final void Function(SelectedCoupon?) onSelect;
+  final VoidCallback onClear;
+
+  const _CouponSelectSheet({
+    required this.coupons,
+    this.selectedCoupon,
+    required this.orderAmount,
+    required this.onSelect,
+    required this.onClear,
+  });
+
+  @override
+  State<_CouponSelectSheet> createState() => _CouponSelectSheetState();
+}
+
+class _CouponSelectSheetState extends State<_CouponSelectSheet> {
+  @override
+  Widget build(BuildContext context) {
+    final availableCoupons = widget.coupons
+        .where((c) => c.state == 2)
+        .where((c) => c.minOrderAmount == null || c.minOrderAmount! <= widget.orderAmount)
+        .toList();
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.6,
+      decoration: const BoxDecoration(
+        color: CupertinoColors.systemBackground,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: Column(
+        children: [
+          // 标题栏
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                const Text('选择优惠券', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+                const Spacer(),
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () => Navigator.pop(context),
+                  child: const Icon(CupertinoIcons.xmark_circle_fill, color: CupertinoColors.systemGrey3),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          // 清除按钮
+          if (widget.selectedCoupon != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: widget.onClear,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(CupertinoIcons.xmark, size: 12, color: CupertinoColors.destructiveRed),
+                    const SizedBox(width: 4),
+                    Text('不使用优惠券', style: TextStyle(color: CupertinoColors.destructiveRed, fontSize: 13)),
+                  ],
+                ),
+              ),
+            ),
+          // 优惠券列表
+          Expanded(
+            child: availableCoupons.isEmpty
+                ? const Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(CupertinoIcons.tag, size: 48, color: CupertinoColors.systemGrey3),
+                        SizedBox(height: 12),
+                        Text('暂无可用优惠券', style: TextStyle(color: CupertinoColors.systemGrey)),
+                      ],
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: availableCoupons.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final coupon = availableCoupons[index];
+                      final isSelected = widget.selectedCoupon?.id == coupon.id;
+                      return _CouponCard(
+                        coupon: coupon,
+                        isSelected: isSelected,
+                        onTap: () {
+                          widget.onSelect(SelectedCoupon(
+                            id: coupon.id,
+                            cent: coupon.cent,
+                            title: coupon.title,
+                            minOrderAmount: coupon.minOrderAmount,
+                          ));
+                        },
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CouponCard extends StatelessWidget {
+  final Coupon coupon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _CouponCard({required this.coupon, required this.isSelected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? CupertinoColors.activeBlue.withValues(alpha: 0.05)
+              : CupertinoColors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? CupertinoColors.activeBlue : CupertinoColors.systemGrey5,
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            // 金额区域
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: CupertinoColors.activeOrange.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    coupon.cent > 0
+                        ? '¥${(coupon.cent / 100).toStringAsFixed(0)}'
+                        : '免费',
+                    style: TextStyle(
+                      color: CupertinoColors.activeOrange,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (coupon.minOrderAmount != null)
+                    Text(
+                      '满${(coupon.minOrderAmount! / 100).toStringAsFixed(0)}可用',
+                      style: TextStyle(
+                        color: CupertinoColors.activeOrange,
+                        fontSize: 10,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            // 信息区域
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(coupon.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  const SizedBox(height: 4),
+                  Text(
+                    coupon.description ?? coupon.typeLabel,
+                    style: TextStyle(color: CupertinoColors.secondaryLabel, fontSize: 12),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (coupon.invalidAt != null)
+                    Text(
+                      '有效期至 ${DateTime.fromMillisecondsSinceEpoch(coupon.invalidAt! * 1000).toString().substring(0, 10)}',
+                      style: TextStyle(color: CupertinoColors.tertiaryLabel, fontSize: 11),
+                    ),
+                ],
+              ),
+            ),
+            // 选中状态
+            Icon(
+              isSelected ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.circle,
+              color: isSelected ? CupertinoColors.activeBlue : CupertinoColors.systemGrey4,
+              size: 22,
+            ),
+          ],
+        ),
       ),
     );
   }

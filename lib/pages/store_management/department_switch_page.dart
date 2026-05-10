@@ -5,10 +5,11 @@ import '../../api/employee_api.dart';
 import '../../models/employee.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 部门切换页面 Provider
 final departmentSwitchProvider = FutureProvider<List<Department>>((ref) async {
-  final user = ref.read(currentUserProvider).valueOrNull;
+  final user = ref.read(currentUserProvider).value;
   if (user == null) return [];
 
   final api = EmployeeApi();
@@ -41,7 +42,7 @@ class _DepartmentSwitchPageState extends ConsumerState<DepartmentSwitchPage> {
     super.initState();
     // 默认选中当前部门
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final user = ref.read(currentUserProvider).valueOrNull;
+      final user = ref.read(currentUserProvider).value;
       if (user != null) {
         final api = EmployeeApi();
         try {

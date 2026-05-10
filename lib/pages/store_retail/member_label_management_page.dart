@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/label_api.dart';
 import '../../models/label.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 会员标签管理页
 /// 显示指定会员的标签列表，支持添加/移除标签，自定义新建标签
@@ -134,6 +135,18 @@ class _MemberLabelManagementPageState
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('会员标签'),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,

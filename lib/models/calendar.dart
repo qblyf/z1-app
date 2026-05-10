@@ -16,6 +16,7 @@ enum CalendarStatus {
 /// 行事历任务模型
 class CalendarTask extends Equatable {
   final String id;
+  final String? taskLogID; // 任务记录ID (my-check-calendar 返回 taskLogID)
   final String title;
   final String? description;
   final int? departmentId;
@@ -38,6 +39,7 @@ class CalendarTask extends Equatable {
 
   const CalendarTask({
     required this.id,
+    this.taskLogID,
     required this.title,
     this.description,
     this.departmentId,
@@ -59,9 +61,19 @@ class CalendarTask extends Equatable {
     this.updatedAt = 0,
   });
 
+  /// 获取用于跳转任务日志详情的ID，优先使用 taskLogID，否则使用 id
+  String get taskLogIdent => taskLogID ?? id;
+
   factory CalendarTask.fromJson(Map<String, dynamic> json) {
+    // taskLogID 可能是 String 或 int，统一转为 String
+    final taskLogIdRaw = json['taskLogID'] ?? json['taskLogId'] ?? json['taskLogID'];
+    String taskLogIdStr = '';
+    if (taskLogIdRaw != null) {
+      taskLogIdStr = taskLogIdRaw is int ? taskLogIdRaw.toString() : taskLogIdRaw.toString();
+    }
     return CalendarTask(
-      id: json['id'] as String? ?? json['p'] as String? ?? '',
+      id: json['id']?.toString() ?? json['p']?.toString() ?? taskLogIdStr,
+      taskLogID: taskLogIdStr.isNotEmpty ? taskLogIdStr : null,
       title: json['title'] as String? ?? '',
       description: json['description'] as String?,
       departmentId: json['departmentId'] as int? ?? json['department_id'] as int?,
@@ -91,6 +103,7 @@ class CalendarTask extends Equatable {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'taskLogID': taskLogID,
       'title': title,
       'description': description,
       'departmentId': departmentId,
@@ -138,7 +151,159 @@ class CalendarTask extends Equatable {
   bool get isCheckedOut => checkOutTime != null && checkOutTime! > 0;
 
   @override
-  List<Object?> get props => [id, title, assignee, startTime, status];
+  List<Object?> get props => [id, title, assignee, startTime, status, taskLogID];
+}
+
+/// 行事历详情（含任务日志全字段）
+/// 对应 PWA CalendarDetail 类型，组合 Task + TaskLog + TaskGiveLog
+/// 用于行事历详情页展示
+class CalendarDetail extends Equatable {
+  // === 任务基本信息 ===
+  final String name;              // 任务名称
+  final String taskLogStatus;     // 任务记录状态
+  final List<int> labelIDs;       // 任务标签ID列表
+  final String introduction;      // 任务简介
+  final String description;        // 详细说明
+  final int duration;             // 持续时长（小时）
+  final List<int> responsibleRoles;    // 责任角色ID列表
+  final List<int> responsibleEmployees; // 责任职员ID列表
+  final List<String> accessoriesUrls;  // 任务附件URL
+
+  // === 发放信息 ===
+  final int startAt;              // 开始发放时间
+  final int? endAt;              // 结束发放时间
+  final String allowCheckType;    // 验收类型: currentLeader/higherLeader/designation/nocheck
+  final bool isNeedSelfEvaluation; // 是否需要自评
+  final int? giveTaskWeight;      // 任务权重
+  final int responsibleEmployee;   // 当前责任人标识符
+
+  // === 任务记录信息 ===
+  final int taskLogID;           // 任务记录ID
+  final int? taskScore;          // 任务打分(1-5)
+  final int? checkScore;         // 验收打分(1-5)
+  final String? selfEvaluationContent; // 自评文字
+  final List<String> selfEvaluationAccessories; // 自评附件
+  final int? lastCheckBy;        // 最后验收人
+  final String? lastCheckRemarks; // 验收评论
+  final int? lastScore;           // 最终得分（已完成时显示）
+  final List<int> readUser;      // 已读用户列表
+  final int? taskCreatedAt;      // 任务创建时间
+  final int? taskCreatedBy;      // 任务创建人
+  final int? taskUpdatedAt;      // 任务更新时间
+  final int? taskUpdatedBy;       // 任务更新人
+
+  // === 附加信息 ===
+  final String? categoryName;    // 项目/分类名称
+
+  const CalendarDetail({
+    required this.name,
+    required this.taskLogStatus,
+    this.labelIDs = const [],
+    this.introduction = '',
+    this.description = '',
+    this.duration = 0,
+    this.responsibleRoles = const [],
+    this.responsibleEmployees = const [],
+    this.accessoriesUrls = const [],
+    required this.startAt,
+    this.endAt,
+    this.allowCheckType = 'nocheck',
+    this.isNeedSelfEvaluation = false,
+    this.giveTaskWeight,
+    required this.responsibleEmployee,
+    required this.taskLogID,
+    this.taskScore,
+    this.checkScore,
+    this.selfEvaluationContent,
+    this.selfEvaluationAccessories = const [],
+    this.lastCheckBy,
+    this.lastCheckRemarks,
+    this.lastScore,
+    this.readUser = const [],
+    this.taskCreatedAt,
+    this.taskCreatedBy,
+    this.taskUpdatedAt,
+    this.taskUpdatedBy,
+    this.categoryName,
+  });
+
+  factory CalendarDetail.fromJson(Map<String, dynamic> json) {
+    List<int> parseIntList(dynamic v) {
+      if (v == null) return [];
+      if (v is List) return v.map((e) => e is int ? e : int.tryParse(e.toString()) ?? 0).toList();
+      return [];
+    }
+
+    List<String> parseStringList(dynamic v) {
+      if (v == null) return [];
+      if (v is List) return v.map((e) => e.toString()).toList();
+      return [];
+    }
+
+    return CalendarDetail(
+      name: json['name'] as String? ?? '',
+      taskLogStatus: json['taskLogStatus'] as String? ?? '',
+      labelIDs: parseIntList(json['labelIDs']),
+      introduction: json['introduction'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      duration: json['duration'] as int? ?? 0,
+      responsibleRoles: parseIntList(json['responsibleRoles']),
+      responsibleEmployees: parseIntList(json['responsibleEmployees']),
+      accessoriesUrls: parseStringList(json['accessoriesUrls']),
+      startAt: json['startAt'] as int? ?? 0,
+      endAt: json['endAt'] as int?,
+      allowCheckType: json['allowCheckType'] as String? ?? 'nocheck',
+      isNeedSelfEvaluation: json['isNeedSelfEvaluation'] as bool? ?? false,
+      giveTaskWeight: json['giveTaskWeight'] as int?,
+      responsibleEmployee: json['responsibleEmployee'] as int? ?? 0,
+      taskLogID: json['taskLogID'] as int? ?? 0,
+      taskScore: json['taskScore'] as int?,
+      checkScore: json['checkScore'] as int?,
+      selfEvaluationContent: json['selfEvaluationContent'] as String?,
+      selfEvaluationAccessories: parseStringList(json['selfEvaluationAccessories']),
+      lastCheckBy: json['lastCheckBy'] as int?,
+      lastCheckRemarks: json['lastCheckRemarks'] as String?,
+      lastScore: json['lastScore'] as int?,
+      readUser: parseIntList(json['readUser']),
+      taskCreatedAt: json['taskCreatedAt'] as int?,
+      taskCreatedBy: json['taskCreatedBy'] as int?,
+      taskUpdatedAt: json['taskUpdatedAt'] as int?,
+      taskUpdatedBy: json['taskUpdatedBy'] as int?,
+      categoryName: json['categoryName'] as String?,
+    );
+  }
+
+  /// 格式化持续时长
+  String get formattedDuration {
+    final days = duration ~/ 24;
+    final hours = duration % 24;
+    return '${days > 0 ? '${days}天' : ''}${hours > 0 ? '${hours}小时' : ''}'.trim();
+  }
+
+  /// 验收类型标签
+  String get allowCheckTypeLabel {
+    switch (allowCheckType) {
+      case 'currentLeader': return '当前部门负责人';
+      case 'higherLeader': return '上级部门负责人';
+      case 'designation': return '指定验收人';
+      case 'nocheck': return '不需要验收';
+      default: return allowCheckType;
+    }
+  }
+
+  /// 任务记录状态标签
+  String get taskLogStatusLabel {
+    switch (taskLogStatus) {
+      case '待验收': return '待验收';
+      case '进行中': return '进行中';
+      case '已完成': return '已完成';
+      case '未完成': return '未完成';
+      default: return taskLogStatus;
+    }
+  }
+
+  @override
+  List<Object?> get props => [taskLogID, name, taskLogStatus];
 }
 
 /// 行事历附件

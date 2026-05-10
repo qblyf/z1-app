@@ -236,19 +236,7 @@ class _MemberDetailPageState extends ConsumerState<MemberDetailPage> {
                           child: CupertinoButton(
                             color: CupertinoColors.systemGrey5.resolveFrom(context),
                             onPressed: () {
-                              showCupertinoDialog(
-                                context: context,
-                                builder: (ctx) => CupertinoAlertDialog(
-                                  title: const Text('提示'),
-                                  content: const Text('回收加单功能开发中...'),
-                                  actions: [
-                                    CupertinoDialogAction(
-                                      child: const Text('确定'),
-                                      onPressed: () => Navigator.pop(ctx),
-                                    ),
-                                  ],
-                                ),
-                              );
+                              context.push('/store-retail/recycle-order/create/${widget.userIdent}');
                             },
                             child: const Text(
                               '回收加单',
@@ -260,19 +248,7 @@ class _MemberDetailPageState extends ConsumerState<MemberDetailPage> {
                         Expanded(
                           child: CupertinoButton.filled(
                             onPressed: () {
-                              showCupertinoDialog(
-                                context: context,
-                                builder: (ctx) => CupertinoAlertDialog(
-                                  title: const Text('提示'),
-                                  content: const Text('销售加单功能开发中...'),
-                                  actions: [
-                                    CupertinoDialogAction(
-                                      child: const Text('确定'),
-                                      onPressed: () => Navigator.pop(ctx),
-                                    ),
-                                  ],
-                                ),
-                              );
+                              context.push('/store-retail/order/${widget.userIdent}');
                             },
                             child: const Text('销售加单'),
                           ),

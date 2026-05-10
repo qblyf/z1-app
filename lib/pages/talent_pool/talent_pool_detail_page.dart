@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/talent_pool_api.dart';
 import '../../models/talent_pool.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 人才池详情页 Provider
 final talentPoolDetailProvider =

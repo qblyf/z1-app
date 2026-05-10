@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/repair_order_api.dart';
 import '../../models/repair_order.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 class RepairOrderDetailPage extends ConsumerStatefulWidget {
   final int repairID;
@@ -49,6 +50,18 @@ class _RepairOrderDetailPageState extends ConsumerState<RepairOrderDetailPage> {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('维修单详情'),
         previousPageTitle: '返回',
       ),

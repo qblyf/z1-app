@@ -5,6 +5,7 @@ import '../models/user.dart';
 import '../api/member_api.dart';
 import '../api/auth_api.dart';
 import '../services/token_service.dart';
+import '../router/app_router.dart';
 
 /// Token 服务 Provider
 final tokenServiceProvider = Provider<TokenService>((ref) {
@@ -96,14 +97,28 @@ class CurrentUserNotifier extends AsyncNotifier<Member?> {
       debugPrint('currentUserProvider._loadUser: API错误 $e');
       // 如果是 403 错误，说明 token 无效
       if (e is DioException && e.response?.statusCode == 403) {
-        debugPrint('currentUserProvider._loadUser: 403错误，清除token');
+        debugPrint('currentUserProvider._loadUser: 403错误，清除token并跳转登录页');
         await _tokenService.clearToken();
+        setLoginState(false);
+        // 延迟跳转，让页面先显示错误
+        Future.microtask(() {
+          try {
+            appRouter.go(Routes.login);
+          } catch (_) {}
+        });
         return null;
       }
       // 其他错误也清除 token
       if (e.toString().contains('403') || e.toString().contains('jwt')) {
-        debugPrint('currentUserProvider._loadUser: jwt无效，清除token');
+        debugPrint('currentUserProvider._loadUser: jwt无效，清除token并跳转登录页');
         await _tokenService.clearToken();
+        setLoginState(false);
+        // 延迟跳转
+        Future.microtask(() {
+          try {
+            appRouter.go(Routes.login);
+          } catch (_) {}
+        });
         return null;
       }
       rethrow;

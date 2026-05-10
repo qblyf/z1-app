@@ -266,12 +266,18 @@ class RetailCart {
   final List<RetailServiceItem> services;
   final List<RetailNonStandardItem> nonStandards;
   final RetailOrderType orderType;
+  /// 已选优惠券（最多1张）
+  final SelectedCoupon? selectedCoupon;
+  /// 赠品列表（按商品 key 索引）
+  final Map<String, List<CartGiveaway>> giveaways;
 
   const RetailCart({
     this.products = const [],
     this.services = const [],
     this.nonStandards = const [],
     this.orderType = RetailOrderType.standard,
+    this.selectedCoupon,
+    this.giveaways = const {},
   });
 
   /// 订单总金额（分）
@@ -289,7 +295,22 @@ class RetailCart {
     return amount;
   }
 
+  /// 优惠券抵扣金额（分）
+  int get couponDiscount {
+    return selectedCoupon?.cent ?? 0;
+  }
+
+  /// 优惠后实付金额（分）
+  int get payableAmount {
+    final after = totalAmount - couponDiscount;
+    return after > 0 ? after : 0;
+  }
+
   String get formattedTotal => '¥${(totalAmount / 100).toStringAsFixed(2)}';
+  String get formattedPayable => '¥${(payableAmount / 100).toStringAsFixed(2)}';
+  String get formattedCouponDiscount =>
+      '-¥${(couponDiscount / 100).toStringAsFixed(2)}';
+
   bool get isEmpty => products.isEmpty && services.isEmpty && nonStandards.isEmpty;
   int get itemCount => products.length + services.length + nonStandards.length;
 
@@ -298,12 +319,17 @@ class RetailCart {
     List<RetailServiceItem>? services,
     List<RetailNonStandardItem>? nonStandards,
     RetailOrderType? orderType,
+    SelectedCoupon? selectedCoupon,
+    Map<String, List<CartGiveaway>>? giveaways,
+    bool clearCoupon = false,
   }) {
     return RetailCart(
       products: products ?? this.products,
       services: services ?? this.services,
       nonStandards: nonStandards ?? this.nonStandards,
       orderType: orderType ?? this.orderType,
+      selectedCoupon: clearCoupon ? null : (selectedCoupon ?? this.selectedCoupon),
+      giveaways: giveaways ?? this.giveaways,
     );
   }
 
@@ -311,30 +337,84 @@ class RetailCart {
   List<Map<String, dynamic>> toOrderProducts() {
     final list = <Map<String, dynamic>>[];
     for (final p in products) {
+      final key = 'sku-${p.skuId}';
+      final giveawayList = giveaways[key] ?? [];
       list.add({
         'skuID': p.skuId,
         'qty': p.qty,
         'discountPrice': p.discountPrice,
         'services': p.services.map((e) => e.toJson()).toList(),
+        if (giveawayList.isNotEmpty)
+          'giveaways': giveawayList.map((g) => g.toJson()).toList(),
       });
     }
     for (final s in services) {
+      final key = 'service-${s.serviceId}';
+      final giveawayList = giveaways[key] ?? [];
       list.add({
         'serviceID': s.serviceId,
         'qty': s.qty,
         'discountPrice': s.effectivePrice,
+        if (giveawayList.isNotEmpty)
+          'giveaways': giveawayList.map((g) => g.toJson()).toList(),
       });
     }
     for (final n in nonStandards) {
+      final key = 'item-${n.itemId}';
+      final giveawayList = giveaways[key] ?? [];
       list.add({
         'itemID': n.itemId,
         'qty': n.qty,
         'discountPrice': n.effectivePrice,
         'services': n.services.map((e) => e.toJson()).toList(),
+        if (giveawayList.isNotEmpty)
+          'giveaways': giveawayList.map((g) => g.toJson()).toList(),
       });
     }
     return list;
   }
+}
+
+/// 已选优惠券（代下单用）
+class SelectedCoupon {
+  final int id;
+  final int cent;
+  final String title;
+  final int? minOrderAmount;
+
+  const SelectedCoupon({
+    required this.id,
+    required this.cent,
+    required this.title,
+    this.minOrderAmount,
+  });
+
+  String get formattedAmount => '¥${(cent / 100).toStringAsFixed(2)}';
+}
+
+/// 购物车赠品项
+class CartGiveaway {
+  final int activityId;
+  final String type; // 'sku' or 'service'
+  final int giftId;
+  final String? giftName;
+  final String? thumbnail;
+
+  const CartGiveaway({
+    required this.activityId,
+    required this.type,
+    required this.giftId,
+    this.giftName,
+    this.thumbnail,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'type': type,
+    if (type == 'sku') 'skuID': giftId,
+    if (type == 'service') 'serviceID': giftId,
+    if (giftName != null) 'giftName': giftName,
+    if (thumbnail != null) 'thumbnail': thumbnail,
+  };
 }
 
 /// 会员等级信息

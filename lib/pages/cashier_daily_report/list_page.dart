@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/cashier_daily_report_api.dart';
 import '../../models/cashier_daily_report.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 final _cashierApiProvider = Provider((_) => CashierDailyReportApi());
 
@@ -110,6 +111,18 @@ class _CashierDailyReportListPageState
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('收银日报'),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,

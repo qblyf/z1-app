@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/stocktaking_api.dart';
 import '../../models/stocktaking.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 我的盘库记录页（最近24小时，我负责的仓库）
 /// 对应 PWA /pages/path-d/stocktaking-log-my.tsx

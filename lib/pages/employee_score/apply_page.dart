@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/employee_score_providers.dart';
 import '../../models/employee_score.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 积分申报页面（员工提交申报）
 class ApplyPage extends ConsumerStatefulWidget {
@@ -139,6 +140,18 @@ class _ApplyPageState extends ConsumerState<ApplyPage> {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('积分申报'),
         trailing: _isSubmitting
             ? null

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/store_api.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 门店基础信息页
 /// 对应 PWA /pages/path-d/store-management/base-info.tsx

@@ -2,8 +2,11 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../api/invoice_api.dart';
+import '../../api/member_api.dart';
 import '../../models/invoice.dart';
 import '../../theme/app_theme.dart';
+import '../../providers/auth_provider.dart';
+import '../../router/app_router.dart';
 
 /// 发票申请表单页
 class InvoiceApplicationFormPage extends ConsumerStatefulWidget {
@@ -293,6 +296,18 @@ class _InvoiceApplicationFormPageState
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: Text(isWithOrder ? '有订单发票申请' : '无订单发票申请'),
         previousPageTitle: '返回',
       ),
@@ -957,34 +972,20 @@ class _InvoiceApplicationFormPageState
   }
 
   void _showOrderSelector() {
-    // TODO: 实现订单选择器（输入手机号查询订单）
-    showCupertinoDialog(
+    showCupertinoModalPopup(
       context: context,
-      builder: (_) => CupertinoAlertDialog(
-        title: const Text('输入订单号'),
-        content: Column(
-          children: [
-            const SizedBox(height: 8),
-            CupertinoTextField(
-              placeholder: '请输入订单号',
-              onChanged: (v) => _phone = v,
-            ),
-          ],
-        ),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('取消'),
-            onPressed: () => Navigator.pop(context),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            child: const Text('确定'),
-            onPressed: () {
-              // TODO: 实际应该调用API查询
-              Navigator.pop(context);
-            },
-          ),
-        ],
+      builder: (_) => _InvoiceOrderSelectorSheet(
+        selectedOrderNumbers: _selectedOrderNumbers,
+        onConfirm: (orderNumbers) {
+          setState(() {
+            _selectedOrderNumbers = orderNumbers;
+          });
+          if (orderNumbers.isNotEmpty) {
+            _checkOrders();
+          } else {
+            setState(() => _checkResult = null);
+          }
+        },
       ),
     );
   }
@@ -1121,18 +1122,495 @@ class _InvoiceApplicationFormPageState
   // ========== 辅助方法 ==========
 
   String _getCurrentUserName() {
-    // TODO: 从Token服务获取当前用户信息
-    return '当前员工';
+    final user = ref.read(currentUserProvider).value;
+    return user?.realName ?? '未知';
   }
 
   String _getCurrentDeptName() {
-    // TODO: 从Token服务获取当前部门信息
-    return '当前部门';
+    // 从 currentUser 获取部门名称
+    final user = ref.read(currentUserProvider).value;
+    return user?.deptName ?? '未知';
   }
 
   String _formatDate(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
+}
+
+/// 发票订单选择器（按手机号查询）
+/// 对应 PWA: SelectOrderByPhone
+class _InvoiceOrderSelectorSheet extends StatefulWidget {
+  final List<String> selectedOrderNumbers;
+  final ValueChanged<List<String>> onConfirm;
+
+  const _InvoiceOrderSelectorSheet({
+    required this.selectedOrderNumbers,
+    required this.onConfirm,
+  });
+
+  @override
+  State<_InvoiceOrderSelectorSheet> createState() => _InvoiceOrderSelectorSheetState();
+}
+
+class _InvoiceOrderSelectorSheetState extends State<_InvoiceOrderSelectorSheet> {
+  final InvoiceApi _invoiceApi = InvoiceApi();
+  final MemberApi _memberApi = MemberApi();
+  final _phoneController = TextEditingController();
+
+  bool _isLoading = false;
+  String? _errorMsg;
+  List<_OrderItemData> _orders = [];
+  Set<String> _selected = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = Set.from(widget.selectedOrderNumbers);
+  }
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  bool _isValidPhone(String v) {
+    return RegExp(r'^1[3-9]\d{9}$').hasMatch(v.trim());
+  }
+
+  Future<void> _searchByPhone(String phone) async {
+    final trimmed = phone.trim();
+    if (!_isValidPhone(trimmed)) {
+      setState(() => _errorMsg = '请输入正确的手机号');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMsg = null;
+      _orders = [];
+    });
+
+    try {
+      // 1. 搜索会员
+      final members = await _memberApi.getList(mobilePhone: trimmed);
+      if (members.isEmpty) {
+        setState(() {
+          _isLoading = false;
+          _errorMsg = '未找到该手机号的会员';
+        });
+        return;
+      }
+      final member = members.first;
+
+      // 2. 获取可开票订单
+      final orders = await _invoiceApi.getOrderInfoByMember(member.userIdent);
+
+      // 3. 转换为内部数据格式
+      final items = orders.map((o) {
+        String productName = '未知商品';
+        if (o.serviceInfo.isNotEmpty) {
+          productName = o.serviceInfo.first.name ?? '未知服务';
+        } else if (o.productInfo.isNotEmpty) {
+          productName = o.productInfo.first.name ?? '未知商品';
+        } else if (o.itemInfo.isNotEmpty) {
+          productName = o.itemInfo.first.name ?? '未知商品';
+        }
+
+        return _OrderItemData(
+          orderNumber: o.orderInfo.orderNumber,
+          genre: o.orderInfo.genre,
+          mallOrderNumber: o.mallOrderNumber,
+          productName: productName,
+          amount: o.totalAmount,
+          createdAt: o.orderInfo.createdAt,
+          sellerIdent: o.orderInfo.sellerIdent,
+        );
+      }).toList();
+
+      setState(() {
+        _orders = items;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMsg = '获取订单失败: $e';
+      });
+    }
+  }
+
+  void _toggle(String orderNumber) {
+    setState(() {
+      if (_selected.contains(orderNumber)) {
+        _selected.remove(orderNumber);
+      } else {
+        _selected.add(orderNumber);
+      }
+    });
+  }
+
+  void _confirm() async {
+    if (_selected.isEmpty) {
+      _showToast('请选择订单');
+      return;
+    }
+
+    // 调用后端校验
+    setState(() => _isLoading = true);
+    try {
+      await _invoiceApi.checkOrder(orderNumbers: _selected.toList());
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onConfirm(_selected.toList());
+      }
+    } catch (e) {
+      if (mounted) {
+        _showToast('校验失败: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _showToast(String msg) {
+    showCupertinoDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => CupertinoAlertDialog(
+        content: Text(msg),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('确定'),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      decoration: const BoxDecoration(
+        color: CupertinoColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(15)),
+      ),
+      child: Column(
+        children: [
+          // 标题栏
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    '选择订单',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: const Icon(CupertinoIcons.xmark_circle_fill,
+                      size: 24, color: Color(0xFF0575FF)),
+                ),
+              ],
+            ),
+          ),
+          Container(height: 0.5, color: AppColors.divider),
+
+          // 搜索栏
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: CupertinoSearchTextField(
+                    controller: _phoneController,
+                    placeholder: '输入手机号搜索订单',
+                    keyboardType: TextInputType.phone,
+                    onSubmitted: _searchByPhone,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                CupertinoButton(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(20),
+                  onPressed: () => _searchByPhone(_phoneController.text),
+                  child: const Text('搜索', style: TextStyle(fontSize: 14)),
+                ),
+              ],
+            ),
+          ),
+
+          // 错误信息
+          if (_errorMsg != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Text(
+                _errorMsg!,
+                style: const TextStyle(color: Color(0xFFFF3B30), fontSize: 13),
+              ),
+            ),
+
+          // 加载中
+          if (_isLoading)
+            const Expanded(
+              child: Center(child: CupertinoActivityIndicator()),
+            )
+          else if (_orders.isEmpty && _errorMsg == null)
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(CupertinoIcons.search,
+                        size: 64, color: AppColors.textTertiary),
+                    const SizedBox(height: 12),
+                    Text(
+                      '输入手机号搜索订单',
+                      style: AppText.caption,
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                itemCount: _orders.length,
+                itemBuilder: (_, i) => _buildOrderCard(_orders[i]),
+              ),
+            ),
+
+          // 确认按钮
+          Container(
+            padding: EdgeInsets.fromLTRB(
+              12,
+              8,
+              12,
+              MediaQuery.of(context).padding.bottom + 12,
+            ),
+            child: Column(
+              children: [
+                if (_selected.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      '已选 ${_selected.length} 个订单',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF666666),
+                      ),
+                    ),
+                  ),
+                SizedBox(
+                  width: double.infinity,
+                  child: CupertinoButton.filled(
+                    borderRadius: BorderRadius.circular(22),
+                    onPressed: _isLoading ? null : _confirm,
+                    child: const Text('确认', style: TextStyle(fontSize: 15)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrderCard(_OrderItemData item) {
+    final isSelected = _selected.contains(item.orderNumber);
+    final isStore = item.genre == '店内';
+
+    return GestureDetector(
+      onTap: () => _toggle(item.orderNumber),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF4F4F4),
+          borderRadius: BorderRadius.circular(10),
+          border: isSelected
+              ? Border.all(color: const Color(0xFF0054E9), width: 1.5)
+              : null,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 订单类型 + 订单号
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: isStore
+                        ? const Color(0xFFE3F2FD)
+                        : const Color(0xFFFFF3E0),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    isStore ? '零售单号' : '网销单号',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: isStore
+                          ? const Color(0xFF1565C0)
+                          : const Color(0xFFE65100),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    item.orderNumber,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                // 选中状态
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? const Color(0xFF0054E9)
+                        : CupertinoColors.white,
+                    border: isSelected
+                        ? null
+                        : Border.all(color: const Color(0xFFB9B9B9)),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: isSelected
+                      ? const Icon(
+                          CupertinoIcons.checkmark,
+                          size: 14,
+                          color: CupertinoColors.white,
+                        )
+                      : null,
+                ),
+              ],
+            ),
+
+            // 商城单号（网销单）
+            if (!isStore && item.mallOrderNumber != null) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const SizedBox(width: 80),
+                  const Text(
+                    '商城单号',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF999999)),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    item.mallOrderNumber!,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+            ],
+
+            const SizedBox(height: 6),
+            // 商品名称
+            Row(
+              children: [
+                const SizedBox(
+                  width: 80,
+                  child: Text(
+                    '商品名称',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF999999)),
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    item.productName,
+                    style: const TextStyle(fontSize: 13),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 6),
+            // 实付金额
+            Row(
+              children: [
+                const SizedBox(
+                  width: 80,
+                  child: Text(
+                    '实付金额',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF999999)),
+                  ),
+                ),
+                Text(
+                  '¥${(item.amount / 100).toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFFF9500),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 6),
+            // 创建日期
+            Row(
+              children: [
+                const SizedBox(
+                  width: 80,
+                  child: Text(
+                    '创建日期',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF999999)),
+                  ),
+                ),
+                Text(
+                  _formatDate(item.createdAt),
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(int unix) {
+    if (unix == 0) return '-';
+    final dt = DateTime.fromMillisecondsSinceEpoch(unix * 1000);
+    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+  }
+}
+
+/// 内部订单数据
+class _OrderItemData {
+  final String orderNumber;
+  final String genre;
+  final String? mallOrderNumber;
+  final String productName;
+  final int amount;
+  final int createdAt;
+  final int? sellerIdent;
+
+  const _OrderItemData({
+    required this.orderNumber,
+    required this.genre,
+    this.mallOrderNumber,
+    required this.productName,
+    required this.amount,
+    required this.createdAt,
+    this.sellerIdent,
+  });
 }
 
 /// 通用选择弹窗

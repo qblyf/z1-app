@@ -5,6 +5,7 @@ import '../../api/employee_score_api.dart';
 import '../../models/employee_score.dart';
 import '../../providers/employee_score_providers.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 赏罚工分明细页面
 /// 对应 PWA: /employee-score/reward-punishment-details
@@ -103,6 +104,18 @@ class _RewardPunishmentDetailsPageState extends ConsumerState<RewardPunishmentDe
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('赏罚工分明细'),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,

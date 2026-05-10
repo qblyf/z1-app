@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/goods_request_api.dart';
 import '../../models/goods_request.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 报货单列表页（要货）
 class GoodsRequestListPage extends ConsumerStatefulWidget {
@@ -91,6 +92,18 @@ class _GoodsRequestListPageState extends ConsumerState<GoodsRequestListPage> {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('报货单'),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,

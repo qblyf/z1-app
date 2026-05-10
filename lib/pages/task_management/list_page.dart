@@ -7,6 +7,7 @@ import '../../api/task_management_api.dart';
 import '../../models/task_management.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../router/app_router.dart';
 
 /// 岗位任务管理列表页
 class TaskManagementPage extends ConsumerStatefulWidget {
@@ -23,8 +24,25 @@ class _TaskManagementPageState extends ConsumerState<TaskManagementPage> {
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('岗位任务'),
+      navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
+        middle: const Text('岗位任务'),
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Icon(CupertinoIcons.add),
+          onPressed: () => context.push('/task-management/template/edit'),
+        ),
       ),
       child: SafeArea(
         child: Column(
@@ -37,6 +55,7 @@ class _TaskManagementPageState extends ConsumerState<TaskManagementPage> {
                   Expanded(child: _TabButton(label: '任务分配', isActive: _tabIndex == 0, onTap: () => setState(() => _tabIndex = 0))),
                   Expanded(child: _TabButton(label: '执行记录', isActive: _tabIndex == 1, onTap: () => setState(() => _tabIndex = 1))),
                   Expanded(child: _TabButton(label: '任务统计', isActive: _tabIndex == 2, onTap: () => setState(() => _tabIndex = 2))),
+                  Expanded(child: _TabButton(label: '模板', isActive: _tabIndex == 3, onTap: () => setState(() => _tabIndex = 3))),
                 ],
               ),
             ),
@@ -45,7 +64,9 @@ class _TaskManagementPageState extends ConsumerState<TaskManagementPage> {
                   ? const _AllocationListView()
                   : _tabIndex == 1
                       ? const _LogListView()
-                      : const _StatisticsTab(),
+                      : _tabIndex == 2
+                          ? const _StatisticsTab()
+                          : const _TemplateListView(),
             ),
           ],
         ),
@@ -338,80 +359,85 @@ class _AllocationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.md),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: CupertinoColors.white,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: AppShadows.card,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  item.taskTemplateName ?? '任务模板${item.taskTemplateID}',
-                  style: AppText.body.copyWith(fontWeight: FontWeight.w600),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0A84FF).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  item.type.label,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF0A84FF)),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(CupertinoIcons.repeat, size: 14, color: AppColors.textTertiary),
-              const SizedBox(width: 4),
-              Text(item.repeatCycleLabel, style: AppText.caption),
-              const SizedBox(width: 12),
-              Icon(CupertinoIcons.clock, size: 14, color: AppColors.textTertiary),
-              const SizedBox(width: 4),
-              Text('持续 ${item.duration}h', style: AppText.caption),
-            ],
-          ),
-          if (item.responsibleEmployeeNames.isNotEmpty) ...[
-            const SizedBox(height: 8),
+    return GestureDetector(
+      onTap: () => context.push('/task-management/allocation-info/${item.id}'),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: AppSpacing.md),
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: CupertinoColors.white,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          boxShadow: AppShadows.card,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Row(
               children: [
-                Icon(CupertinoIcons.person_2, size: 14, color: AppColors.textTertiary),
-                const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    item.responsibleEmployeeNames.where((n) => n != null).join('、'),
-                    style: AppText.caption,
+                    item.taskTemplateName ?? '任务模板${item.taskTemplateID}',
+                    style: AppText.body.copyWith(fontWeight: FontWeight.w600),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0A84FF).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    item.type.label,
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF0A84FF)),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(CupertinoIcons.chevron_right, size: 16, color: Color(0xFFC7C7CC)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(CupertinoIcons.repeat, size: 14, color: AppColors.textTertiary),
+                const SizedBox(width: 4),
+                Text(item.repeatCycleLabel, style: AppText.caption),
+                const SizedBox(width: 12),
+                Icon(CupertinoIcons.clock, size: 14, color: AppColors.textTertiary),
+                const SizedBox(width: 4),
+                Text('持续 ${item.duration}h', style: AppText.caption),
+              ],
+            ),
+            if (item.responsibleEmployeeNames.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(CupertinoIcons.person_2, size: 14, color: AppColors.textTertiary),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      item.responsibleEmployeeNames.where((n) => n != null).join('、'),
+                      style: AppText.caption,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(CupertinoIcons.calendar, size: 14, color: AppColors.textTertiary),
+                const SizedBox(width: 4),
+                Text(item.formattedCreatedAt, style: AppText.caption),
+                const Spacer(),
+                Text(item.creatorName ?? '-', style: AppText.caption),
               ],
             ),
           ],
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(CupertinoIcons.calendar, size: 14, color: AppColors.textTertiary),
-              const SizedBox(width: 4),
-              Text(item.formattedCreatedAt, style: AppText.caption),
-              const Spacer(),
-              Text(item.creatorName ?? '-', style: AppText.caption),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -790,7 +816,7 @@ class _StatisticsTabState extends ConsumerState<_StatisticsTab> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('\$count', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: color)),
+            Text('$count', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: color)),
             Text(label, style: TextStyle(fontSize: 10, color: color)),
           ],
         ),
@@ -940,5 +966,210 @@ class _StatisticsTabState extends ConsumerState<_StatisticsTab> {
     if (item.labelID != null) return '标签 #${item.labelID}';
     if (item.taskTemplateCate != null) return item.taskTemplateCate!;
     return '-';
+  }
+}
+
+// ── 任务模板列表 ─────────────────────────────────────────────
+
+class _TemplateListView extends ConsumerStatefulWidget {
+  const _TemplateListView();
+
+  @override
+  ConsumerState<_TemplateListView> createState() => _TemplateListViewState();
+}
+
+class _TemplateListViewState extends ConsumerState<_TemplateListView> {
+  final TaskManagementApi _api = TaskManagementApi();
+  List<TaskTemplate> _list = [];
+  bool _isLoading = true;
+  bool _hasMore = true;
+  int _page = 0;
+  String? _hasError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData(refresh: true);
+  }
+
+  Future<void> _loadData({bool refresh = false}) async {
+    if (_isLoading) return;
+    if (refresh) { _page = 0; _hasMore = true; }
+    if (!_hasMore) return;
+    setState(() { _isLoading = true; _hasError = null; });
+    try {
+      final data = await _api.listTaskTemplates(limit: 20, offset: _page * 20);
+      if (!mounted) return;
+      setState(() {
+        if (refresh) _list = data; else _list.addAll(data);
+        _hasMore = data.length >= 20;
+        _isLoading = false;
+        _page++;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _hasError = e.toString(); _isLoading = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_hasError != null && _list.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(CupertinoIcons.exclamationmark_circle, size: 48, color: CupertinoColors.systemGrey),
+            const SizedBox(height: 12),
+            Text('加载失败', style: AppText.body),
+            const SizedBox(height: 12),
+            CupertinoButton(onPressed: () => _loadData(refresh: true), child: const Text('重新加载')),
+          ],
+        ),
+      );
+    }
+    return NotificationListener<ScrollNotification>(
+      onNotification: (n) {
+        if (n is ScrollEndNotification && n.metrics.extentAfter < 100 && _hasMore && !_isLoading) {
+          _loadData();
+        }
+        return false;
+      },
+      child: CustomScrollView(
+        slivers: [
+          CupertinoSliverRefreshControl(onRefresh: () => _loadData(refresh: true)),
+          SliverPadding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (_, i) => _TemplateCard(
+                  item: _list[i],
+                  onTap: () => context.push('/task-management/template/edit/${_list[i].id}'),
+                  onToggleStatus: () async {
+                    final item = _list[i];
+                    final newStatus = item.status == 'enabled' ? 'disabled' : 'enabled';
+                    await _api.invalidateTaskTemplate(item.id, disable: newStatus == 'disabled');
+                    _loadData(refresh: true);
+                  },
+                ),
+                childCount: _list.length,
+              ),
+            ),
+          ),
+          if (_isLoading && _list.isNotEmpty)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.all(AppSpacing.md),
+                child: Center(child: CupertinoActivityIndicator()),
+              ),
+            ),
+          if (_list.isEmpty && !_isLoading)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.xl),
+                child: Center(
+                  child: Column(
+                    children: [
+                      const Icon(CupertinoIcons.doc_text, size: 48, color: CupertinoColors.systemGrey3),
+                      const SizedBox(height: 12),
+                      Text('暂无任务模板', style: AppText.caption),
+                      const SizedBox(height: 12),
+                      CupertinoButton(
+                        child: const Text('新建模板'),
+                        onPressed: () => context.push('/task-management/template/edit'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TemplateCard extends StatelessWidget {
+  final TaskTemplate item;
+  final VoidCallback onTap;
+  final VoidCallback onToggleStatus;
+
+  const _TemplateCard({required this.item, required this.onTap, required this.onToggleStatus});
+
+  @override
+  Widget build(BuildContext context) {
+    final isEnabled = item.status == 'enabled';
+    final cateLabel = TaskTemplateCate.fromValue(item.taskTemplateCate)?.label ?? item.taskTemplateCate;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: AppSpacing.md),
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: CupertinoColors.white,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: isEnabled ? null : Border.all(color: CupertinoColors.systemGrey4),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    item.name,
+                    style: AppText.body.copyWith(fontWeight: FontWeight.w600),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: (isEnabled ? const Color(0xFF30D158) : CupertinoColors.systemGrey3).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    isEnabled ? '已启用' : '已停用',
+                    style: AppText.caption.copyWith(
+                      color: isEnabled ? const Color(0xFF30D158) : CupertinoColors.systemGrey,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  minSize: 0,
+                  child: Icon(
+                    isEnabled ? CupertinoIcons.pause_circle : CupertinoIcons.play_circle,
+                    color: CupertinoColors.systemGrey,
+                    size: 22,
+                  ),
+                  onPressed: onToggleStatus,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0A84FF).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(cateLabel, style: AppText.caption.copyWith(color: const Color(0xFF0A84FF))),
+                ),
+                const SizedBox(width: 8),
+                Text('权重: ${item.taskWeight}', style: AppText.caption),
+                const Spacer(),
+                const Icon(CupertinoIcons.chevron_right, size: 16, color: CupertinoColors.systemGrey3),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

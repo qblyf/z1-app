@@ -1,3 +1,4 @@
+import 'package:equatable/equatable.dart';
 import 'api_client.dart';
 import '../models/recycle_order.dart';
 
@@ -251,4 +252,142 @@ class RecycleOrderApi {
     });
     return res.data['result'] as bool? ?? false;
   }
+
+  // ================================================================
+  // 回收估价与问答（创建流程）
+  // ================================================================
+
+  /// 根据设备名称模糊搜索回收规则
+  /// GET /recycle/list/title?title=xxx
+  Future<List<RecycleRuleSimple>> getRecycleRulesByTitles(String title) async {
+    final res = await _client.get('/recycle/list/title', queryParameters: {
+      'title': title,
+    });
+    final list = res.data['list'] as List<dynamic>? ?? [];
+    return list
+        .map((e) => RecycleRuleSimple.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// 获取回收规则的所有问答选项
+  /// GET /recycle-answer?ruleID=xxx
+  Future<List<RecycleAnswer>> getRecycleAnswer(int ruleId) async {
+    final res = await _client.get('/recycle-answer', queryParameters: {
+      'ruleID': ruleId,
+    });
+    final result = res.data['result'] as List<dynamic>? ?? [];
+    return result
+        .map((e) => RecycleAnswer.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// 计算回收估价
+  /// GET /recycle/price?ruleID=xxx&selects=1,2,3
+  Future<RecyclePriceResult> getRecycleRulePrice(
+    int ruleId,
+    List<int> selects,
+  ) async {
+    final res = await _client.get('/recycle/price', queryParameters: {
+      'ruleID': ruleId,
+      'selects': selects.join(','),
+    });
+    final result = res.data['result'] as Map<String, dynamic>?;
+    if (result == null) {
+      return const RecyclePriceResult(evalAmount: 0, costAmount: 0);
+    }
+    return RecyclePriceResult.fromJson(result);
+  }
+}
+
+/// 回收规则简略信息
+class RecycleRuleSimple extends Equatable {
+  final int id;
+  final String title;
+
+  const RecycleRuleSimple({required this.id, required this.title});
+
+  factory RecycleRuleSimple.fromJson(Map<String, dynamic> json) {
+    return RecycleRuleSimple(
+      id: json['id'] as int? ?? 0,
+      title: json['title'] as String? ?? '',
+    );
+  }
+
+  @override
+  List<Object?> get props => [id, title];
+}
+
+/// 回收回答模型
+class RecycleAnswer extends Equatable {
+  final int id;
+  final double? ratio;
+  final int? addend;
+  final String question;
+  final String content;
+  final int? questionIndex;
+  final int? answerIndex;
+  final bool disability;
+  final int? questionType;
+  final int questionId;
+
+  const RecycleAnswer({
+    required this.id,
+    this.ratio,
+    this.addend,
+    required this.question,
+    required this.content,
+    this.questionIndex,
+    this.answerIndex,
+    required this.disability,
+    this.questionType,
+    required this.questionId,
+  });
+
+  factory RecycleAnswer.fromJson(Map<String, dynamic> json) {
+    return RecycleAnswer(
+      id: json['id'] as int? ?? 0,
+      ratio: (json['ratio'] as num?)?.toDouble(),
+      addend: json['addend'] as int?,
+      question: json['question'] as String? ?? '',
+      content: json['content'] as String? ?? '',
+      questionIndex: json['questionIndex'] as int?,
+      answerIndex: json['answerIndex'] as int?,
+      disability: json['disability'] as bool? ?? false,
+      questionType: json['questionType'] as int?,
+      questionId: json['questionID'] as int? ?? 0,
+    );
+  }
+
+  /// 问题类型：1=规格，2=常见问题，3=其他问题
+  bool get isSpec => questionType == 1;
+  bool get isCommon => questionType == 2;
+  bool get isOther => questionType == 3;
+
+  @override
+  List<Object?> get props => [id, question, content, questionType];
+}
+
+/// 回收估价结果
+class RecyclePriceResult extends Equatable {
+  final int evalAmount;
+  final int costAmount;
+
+  const RecyclePriceResult({
+    required this.evalAmount,
+    required this.costAmount,
+  });
+
+  factory RecyclePriceResult.fromJson(Map<String, dynamic> json) {
+    return RecyclePriceResult(
+      evalAmount: json['evalAmount'] as int? ?? 0,
+      costAmount: json['costAmount'] as int? ?? 0,
+    );
+  }
+
+  /// 转为元
+  double get evalAmountYuan => evalAmount / 100;
+  double get costAmountYuan => costAmount / 100;
+
+  @override
+  List<Object?> get props => [evalAmount, costAmount];
 }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/transfer_order_api.dart';
 import '../../models/transfer_order.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 调拨单详情页
 class TransferOrderDetailPage extends ConsumerStatefulWidget {
@@ -173,6 +174,18 @@ class _TransferOrderDetailPageState
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: Text(_order?.transferOrderNumber ?? '调拨单详情'),
         trailing: _order != null &&
                 _order!.status == TransferOrderStatus.pending

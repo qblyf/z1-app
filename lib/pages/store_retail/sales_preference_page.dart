@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import '../../api/label_api.dart';
 import '../../models/label.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 销售偏好页
 /// 显示指定会员的购买偏好和回收次数
@@ -39,15 +40,15 @@ class _SalesPreferencePageState extends State<SalesPreferencePage> {
     try {
       final api = LabelApi();
       // 并行请求购买偏好和回收次数
-      final results = await Future.wait([
+      final List<dynamic> results = await Future.wait([
         api.getSalesPreference(widget.memberIdent),
         api.getRecycleCount(widget.memberIdent),
       ]);
       if (mounted) {
         setState(() {
           _preference = MemberSalesPreference(
-            buyPreference: results[0].buyPreference,
-            recycleCount: results[1],
+            buyPreference: (results[0] as MemberSalesPreference).buyPreference,
+            recycleCount: results[1] as int,
           );
           _isLoading = false;
         });
@@ -170,36 +171,36 @@ class _SalesPreferencePageState extends State<SalesPreferencePage> {
     // 按顺序显示分类
     final categories = [
       _CategoryInfo(
-        id: PreferenceCate.配件.id,
+        id: PreferenceCate.accessory.id,
         name: '配件',
-        preference: BuyPreference.findByCate(preferences, PreferenceCate.配件.id),
+        preference: BuyPreference.findByCate(preferences, PreferenceCate.accessory.id),
       ),
       _CategoryInfo(
-        id: PreferenceCate.手机.id,
+        id: PreferenceCate.phone.id,
         name: '手机',
-        preference: BuyPreference.findByCate(preferences, PreferenceCate.手机.id),
+        preference: BuyPreference.findByCate(preferences, PreferenceCate.phone.id),
       ),
       _CategoryInfo(
-        id: PreferenceCate.电脑.id,
+        id: PreferenceCate.computer.id,
         name: '笔记本',
-        preference: BuyPreference.findByCate(preferences, PreferenceCate.电脑.id),
+        preference: BuyPreference.findByCate(preferences, PreferenceCate.computer.id),
       ),
       _CategoryInfo(
-        id: PreferenceCate.平板.id,
+        id: PreferenceCate.tablet.id,
         name: '平板',
         preference:
-            BuyPreference.findByCate(preferences, PreferenceCate.平板.id),
+            BuyPreference.findByCate(preferences, PreferenceCate.tablet.id),
       ),
       _CategoryInfo(
-        id: PreferenceCate.保护壳.id,
+        id: PreferenceCate.protectiveCase.id,
         name: '保护壳',
         preference:
-            BuyPreference.findByCate(preferences, PreferenceCate.保护壳.id),
+            BuyPreference.findByCate(preferences, PreferenceCate.protectiveCase.id),
       ),
       _CategoryInfo(
-        id: PreferenceCate.贴膜.id,
+        id: PreferenceCate.screenFilm.id,
         name: '保护膜',
-        preference: BuyPreference.findByCate(preferences, PreferenceCate.贴膜.id),
+        preference: BuyPreference.findByCate(preferences, PreferenceCate.screenFilm.id),
       ),
     ];
 
@@ -241,7 +242,7 @@ class _SalesPreferencePageState extends State<SalesPreferencePage> {
             _PreferenceRow(
               left: _PreferenceItem(
                 label: '手机退换次数',
-                value: BuyPreference.findByCate(preferences, PreferenceCate.手机.id)
+                value: BuyPreference.findByCate(preferences, PreferenceCate.phone.id)
                         ?.refundsChangeOrderQuantity ??
                     0,
                 isLeft: true,
@@ -262,7 +263,7 @@ class _SalesPreferencePageState extends State<SalesPreferencePage> {
             _PreferenceRow(
               left: _PreferenceItem(
                 label: '电脑退换次数',
-                value: BuyPreference.findByCate(preferences, PreferenceCate.电脑.id)
+                value: BuyPreference.findByCate(preferences, PreferenceCate.computer.id)
                         ?.refundsChangeOrderQuantity ??
                     0,
                 isLeft: true,

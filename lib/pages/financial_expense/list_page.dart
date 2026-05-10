@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/financial_expense_api.dart';
 import '../../models/financial_expense.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 final _expenseFilterProvider = StateProvider<_ExpenseFilter>((ref) {
   return _ExpenseFilter();
@@ -82,6 +83,18 @@ class _FinancialExpenseListPageState extends ConsumerState<FinancialExpenseListP
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('财务支出'),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,

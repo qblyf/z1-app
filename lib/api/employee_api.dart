@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import 'api_client.dart';
 import '../models/employee.dart';
 
@@ -6,6 +5,17 @@ import '../models/employee.dart';
 /// 对接 z1-mid 后端
 class EmployeeApi {
   final _client = ApiClient();
+
+  /// 获取员工列表
+  /// GET /employee/list-condition?limit=X&offset=0
+  Future<List<Employee>> listEmployees({int limit = 10000, int offset = 0}) async {
+    final response = await _client.get(
+      '/employee/list-condition',
+      queryParameters: {'limit': limit, 'offset': offset},
+    );
+    final list = response.data['list'] as List<dynamic>? ?? [];
+    return list.map((e) => Employee.fromJson(e as Map<String, dynamic>)).toList();
+  }
 
   /// 根据用户标识获取职员信息
   /// GET /employee/by-ident?idents=X

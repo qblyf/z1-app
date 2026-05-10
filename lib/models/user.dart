@@ -46,6 +46,10 @@ class Member extends Equatable {
   final bool? isBroadBand;
   final String? operator;
   final int grade;
+  /// 部门ID
+  final int? deptId;
+  /// 部门名称
+  final String? deptName;
 
   const Member({
     required this.userIdent,
@@ -72,6 +76,8 @@ class Member extends Equatable {
     this.isBroadBand,
     this.operator,
     this.grade = 0,
+    this.deptId,
+    this.deptName,
   });
 
   factory Member.fromJson(Map<String, dynamic> json) {
@@ -106,6 +112,8 @@ class Member extends Equatable {
       isBroadBand: json['isBroadBand'] as bool?,
       operator: json['operator'] as String?,
       grade: json['grade'] as int? ?? 0,
+      deptId: json['deptId'] as int?,
+      deptName: json['deptName'] as String?,
     );
   }
 
@@ -162,5 +170,7 @@ class Member extends Equatable {
         gzhOpenID,
         wxOpenID,
         grade,
+        deptId,
+        deptName,
       ];
 }

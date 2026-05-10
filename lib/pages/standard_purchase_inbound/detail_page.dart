@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../api/standard_purchase_inbound_api.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 标品采购入库单详情页
 /// 对应 PWA /pages/path-d/standard-purchase-inbound/order-detail.tsx

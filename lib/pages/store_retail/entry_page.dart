@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../api/store_retail_api.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 门店零售入口页
 /// 员工输入顾客手机号，查找或注册会员，然后进入零售流程
@@ -119,8 +120,15 @@ class _StoreRetailEntryPageState extends ConsumerState<StoreRetailEntryPage> {
         middle: const Text('门店零售'),
         leading: CupertinoButton(
           padding: EdgeInsets.zero,
-          child: const Icon(CupertinoIcons.back),
-          onPressed: () => context.pop(),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
         ),
       ),
       child: SafeArea(

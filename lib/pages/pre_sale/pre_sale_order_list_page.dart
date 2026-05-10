@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../api/pre_sale_order_api.dart';
 import '../../models/pre_sale_order.dart';
+import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 预售订单列表页
 class PreSaleOrderListPage extends ConsumerStatefulWidget {
@@ -35,7 +37,7 @@ class _PreSaleOrderListPageState
   @override
   void initState() {
     super.initState();
-    _loadData();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
   }
 
   Future<void> _loadData() async {
@@ -43,7 +45,16 @@ class _PreSaleOrderListPageState
 
     setState(() => _isLoading = true);
     try {
-      final orders = await _api.list(limit: 200);
+      // 获取当前用户部门ID进行过滤
+      final user = ref.read(currentUserProvider).value;
+      final deptId = user?.deptId;
+
+      final orders = await _api.list(
+        limit: 200,
+        departments: deptId != null ? [deptId] : null,
+      );
+      // 按更新时间倒序，与 PWA 保持一致
+      orders.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       if (mounted) {
         setState(() {
           _allOrders = orders;
@@ -108,6 +119,18 @@ class _PreSaleOrderListPageState
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('预订订单'),
       ),
       child: SafeArea(

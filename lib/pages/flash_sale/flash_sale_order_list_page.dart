@@ -5,7 +5,7 @@ import '../../api/flash_sale_order_api.dart';
 import '../../api/member_api.dart';
 import '../../models/flash_sale_order.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/common_widgets.dart';
+import '../../router/app_router.dart';
 
 /// 秒杀订单列表页
 class FlashSaleOrderListPage extends ConsumerStatefulWidget {
@@ -70,9 +70,8 @@ class _FlashSaleOrderListPageState
         customers: customers,
         limit: 200,
       );
-
-      // 按状态分组筛选
-      final grouped = _groupByStatus(orders);
+      // 按更新时间倒序，与 PWA 保持一致
+      orders.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
       if (mounted) {
         setState(() {
@@ -153,11 +152,49 @@ class _FlashSaleOrderListPageState
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+        leading: GestureDetector(
+          onTap: () => safePop(context),
+          child: Container(
+            color: CupertinoColors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(CupertinoIcons.back, color: Color(0xFF007AFF), size: 28),
+                SizedBox(width: 4),
+                Text('返回', style: TextStyle(color: Color(0xFF007AFF), fontSize: 17)),
+              ],
+            ),
+          ),
+        ),
         middle: const Text('秒杀订单'),
       ),
       child: SafeArea(
         child: Column(
           children: [
+            // 返回按钮栏
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              color: CupertinoColors.white,
+              child: GestureDetector(
+                onTap: () => safePop(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF007AFF),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(CupertinoIcons.back, size: 24, color: CupertinoColors.white),
+                      SizedBox(width: 8),
+                      Text('返回上一页', style: TextStyle(fontSize: 17, color: CupertinoColors.white, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
             // 搜索栏
             Container(
               padding: const EdgeInsets.symmetric(
@@ -180,12 +217,12 @@ class _FlashSaleOrderListPageState
                   const SizedBox(width: 8),
                   CupertinoButton(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
+                      horizontal: 16,
+                      vertical: 8,
                     ),
-                    color: const Color(0xFF0A84FF),
-                    borderRadius: BorderRadius.circular(18),
-                    minSize: 32,
+                    color: const Color(0xFF007AFF),
+                    borderRadius: BorderRadius.circular(20),
+                    minSize: 36,
                     onPressed: () {
                       setState(
                           () => _phone = _searchController.text.trim());
@@ -193,7 +230,7 @@ class _FlashSaleOrderListPageState
                     },
                     child: const Text(
                       '查询',
-                      style: TextStyle(fontSize: 13),
+                      style: TextStyle(fontSize: 15, color: CupertinoColors.white, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ],

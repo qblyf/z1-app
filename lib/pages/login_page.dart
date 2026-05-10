@@ -8,7 +8,6 @@ import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import '../api/auth_api.dart';
 import '../services/token_service.dart';
-import '../pages/home_page.dart';
 
 /// 从错误中提取用户友好的消息
 String _extractErrorMessage(dynamic e) {
@@ -60,8 +59,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   void initState() {
     super.initState();
     // 预填测试账号（方便调试）
-    // _phoneController.text = '99999999999';
-    // _passwordController.text = 'ncxSEpbZ\$20m\$W6O';
+    _phoneController.text = '99999999999';
+    _passwordController.text = 'ncxSEpbZ\$20m\$W6O';
   }
 
   @override
@@ -113,11 +112,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       // 更新登录状态
       setLoginState(true);
 
-      // 使用 Navigator 直接跳转
-      Navigator.of(context).pushAndRemoveUntil(
-        CupertinoPageRoute(builder: (context) => const HomePage()),
-        (route) => false,
-      );
+      // 使用 go_router 跳转
+      context.go(Routes.home);
     } catch (e, st) {
       debugPrint('登录异常: $e\n$st');
       final msg = _extractErrorMessage(e);

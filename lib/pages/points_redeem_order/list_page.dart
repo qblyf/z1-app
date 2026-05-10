@@ -1,9 +1,11 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:go_router/go_router.dart';
 import '../../api/points_redeem_order_api.dart';
 import '../../models/points_redeem_order.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 final _filterProvider = StateProvider<PointsRedeemOrderStatus?>((ref) => null);
 
@@ -79,6 +81,18 @@ class _PointsRedeemOrderListPageState extends ConsumerState<PointsRedeemOrderLis
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('积分兑换'),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
@@ -155,10 +169,12 @@ class _OrderRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      color: CupertinoColors.white,
-      child: Column(
+    return GestureDetector(
+      onTap: () => context.push('/points-redeem-order/detail/${item.id}'),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        color: CupertinoColors.white,
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -205,6 +221,7 @@ class _OrderRow extends StatelessWidget {
             Text('实付 ¥${(item.payAmountCents! / 100).toStringAsFixed(2)}', style: AppText.caption.copyWith(color: const Color(0xFFFF3B30))),
           ],
         ],
+      ),
       ),
     );
   }

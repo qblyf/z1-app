@@ -1,29 +1,25 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'router/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   runApp(
     const ProviderScope(
-      child: Z1App(),
+      child: TestApp(),
     ),
   );
 }
 
-class Z1App extends StatelessWidget {
-  const Z1App({super.key});
+class TestApp extends StatelessWidget {
+  const TestApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoApp.router(
+    return const CupertinoApp(
       title: '掌上高远',
       debugShowCheckedModeBanner: false,
-      theme: const CupertinoThemeData(
-        primaryColor: CupertinoColors.activeBlue,
-        barBackgroundColor: CupertinoColors.systemBackground,
-      ),
-      routerConfig: appRouter,
+      home: Center(child: Text('Test - App Started!')),
     );
   }
 }

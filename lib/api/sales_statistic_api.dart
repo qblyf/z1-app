@@ -1,4 +1,4 @@
-import '../api_client.dart';
+import 'api_client.dart';
 
 /// 员工销售排行统计
 class SellerSalesRankingItem {

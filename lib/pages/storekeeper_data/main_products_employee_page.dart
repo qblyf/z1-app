@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/storekeeper_data_api.dart';
 import '../../models/storekeeper_data.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 排序字段
 enum MainProductsEmplOrderBy {
@@ -181,6 +182,18 @@ class _MainProductsEmployeePageState extends ConsumerState<MainProductsEmployeeP
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: Text(widget.productName),
       ),
       child: SafeArea(

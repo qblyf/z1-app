@@ -5,6 +5,7 @@ import '../../api/notice_center_api.dart';
 import '../../models/notice_center.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../router/app_router.dart';
 
 /// 通知详情页
 /// 对应 PWA /components/mobile/NoticeInfo.tsx
@@ -98,6 +99,18 @@ class _NoticeDetailPageState extends ConsumerState<NoticeDetailPage> {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('通知详情'),
         trailing: _isLoading
             ? null

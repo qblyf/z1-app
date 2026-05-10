@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/purchase_order_api.dart';
 import '../../models/purchase_order.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 采购订单详情页
 class PurchaseOrderDetailPage extends ConsumerStatefulWidget {
@@ -144,6 +145,18 @@ class _PurchaseOrderDetailPageState
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: Text(_order?.purchaseOrderNumber ?? '采购订单详情'),
         trailing: _order != null && _order!.status == PurchaseOrderStatus.pending
             ? CupertinoButton(

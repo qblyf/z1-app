@@ -111,6 +111,28 @@ class LabelApi {
   }
 
   // ================================================================
+  // 订单标签（整数 type）
+  // ================================================================
+
+  /// 根据类型获取标签列表（整数 type，用于订单标签等场景）
+  /// GET /label/list-by-type?type=16
+  Future<List<OrderLabel>> listByTypeInt(int type) async {
+    final res = await _client.get('/label/list-by-type', queryParameters: {
+      'type': type,
+    });
+    final result = res.data['result'] as List<dynamic>? ?? [];
+    return result
+        .map((e) => OrderLabel.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// 获取订单类型的所有标签
+  /// GET /label/list-by-type?type=16
+  Future<List<OrderLabel>> listOrderLabels() async {
+    return listByTypeInt(16); // LabelTypeInt.order.value
+  }
+
+  // ================================================================
   // 标签项管理
   // ================================================================
 

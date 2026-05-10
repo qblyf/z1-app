@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/storekeeper_data_api.dart';
 import '../../models/storekeeper_data.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 final _rankListProvider = FutureProvider.autoDispose<List<StoreRankItem>>((ref) async {
   final now = DateTime.now();

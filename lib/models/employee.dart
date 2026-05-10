@@ -13,6 +13,8 @@ class Employee extends Equatable {
   final String? dingAvatar;
   /// 所属部门 ID
   final int? departmentId;
+  /// 手机号
+  final String? phone;
 
   const Employee({
     required this.id,
@@ -23,6 +25,7 @@ class Employee extends Equatable {
     this.number,
     this.dingAvatar,
     this.departmentId,
+    this.phone,
   });
 
   factory Employee.fromJson(Map<String, dynamic> json) {
@@ -35,6 +38,7 @@ class Employee extends Equatable {
       number: json['number'] as String?,
       dingAvatar: json['dingAvatar'] as String?,
       departmentId: json['departmentId'] as int?,
+      phone: json['phone'] as String?,
     );
   }
 

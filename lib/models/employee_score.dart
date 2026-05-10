@@ -337,3 +337,178 @@ class CurrentUserScore extends Equatable {
   @override
   List<Object?> get props => [getScores, giveOutScores];
 }
+
+/// 工分类别分组（考核分组）
+class DepartmentEmployeeScoreClassGroup extends Equatable {
+  final int id;
+  final String name;
+  /// 考核周期（1=月, 2=季度, 3=半年, 4=年）
+  final int assessmentCycle;
+  /// 起始月份（1-12）
+  final int startMonth;
+  /// 权重
+  final int weight;
+  final int createdAt;
+  final int createdBy;
+  final int updatedAt;
+  final int updatedBy;
+
+  const DepartmentEmployeeScoreClassGroup({
+    required this.id,
+    required this.name,
+    required this.assessmentCycle,
+    required this.startMonth,
+    required this.weight,
+    required this.createdAt,
+    required this.createdBy,
+    required this.updatedAt,
+    required this.updatedBy,
+  });
+
+  factory DepartmentEmployeeScoreClassGroup.fromJson(Map<String, dynamic> json) {
+    return DepartmentEmployeeScoreClassGroup(
+      id: json['id'] as int? ?? 0,
+      name: json['name'] as String? ?? '',
+      assessmentCycle: json['assessmentCycle'] as int? ?? 0,
+      startMonth: json['startMonth'] as int? ?? 1,
+      weight: json['weight'] as int? ?? 0,
+      createdAt: json['createdAt'] as int? ?? 0,
+      createdBy: json['createdBy'] as int? ?? 0,
+      updatedAt: json['updatedAt'] as int? ?? 0,
+      updatedBy: json['updatedBy'] as int? ?? 0,
+    );
+  }
+
+  /// 获取周期显示文本
+  String get cycleLabel {
+    switch (assessmentCycle) {
+      case 1: return '月度';
+      case 2: return '季度';
+      case 3: return '半年';
+      case 4: return '年度';
+      default: return '未知';
+    }
+  }
+
+  /// 获取周期起止日期范围
+  String? get cycleDateRange {
+    if (assessmentCycle == 0 || startMonth == 0) return null;
+    final now = DateTime.now();
+    int startYear = now.year;
+    int startM = startMonth;
+    // 计算当前周期
+    while (true) {
+      int endM = startM + _cycleMonthLength - 1;
+      if (endM > 12) endM -= 12;
+      if (now.month >= startM && now.month <= (endM > startM ? endM : endM)) {
+        break;
+      }
+      startM = endM;
+      if (startM >= now.month) {
+        startYear--;
+      }
+    }
+    int endM = startM + _cycleMonthLength - 1;
+    int endYear = startYear;
+    if (endM > 12) {
+      endM -= 12;
+      endYear++;
+    }
+    return '$startYear/${startM.toString().padLeft(2, '0')} - $endYear/${endM.toString().padLeft(2, '0')}';
+  }
+
+  int get _cycleMonthLength {
+    switch (assessmentCycle) {
+      case 1: return 1;
+      case 2: return 3;
+      case 3: return 6;
+      case 4: return 12;
+      default: return 1;
+    }
+  }
+
+  @override
+  List<Object?> get props => [id, name, assessmentCycle, weight];
+}
+
+/// 工分类别（单个积分项）
+class DepartmentEmployeeScoreClass extends Equatable {
+  final int id;
+  final String name;
+  final int group; // 关联分组ID
+  final int? maxScore;
+  final int? minScore;
+
+  const DepartmentEmployeeScoreClass({
+    required this.id,
+    required this.name,
+    required this.group,
+    this.maxScore,
+    this.minScore,
+  });
+
+  factory DepartmentEmployeeScoreClass.fromJson(Map<String, dynamic> json) {
+    return DepartmentEmployeeScoreClass(
+      id: json['id'] as int? ?? 0,
+      name: json['name'] as String? ?? '',
+      group: json['group'] as int? ?? 0,
+      maxScore: json['maxScore'] as int?,
+      minScore: json['minScore'] as int?,
+    );
+  }
+
+  @override
+  List<Object?> get props => [id, name, group];
+}
+
+/// 职员得分统计项（来自 score-info 接口）
+class EmployeeScoreGiveLogInfo extends Equatable {
+  final int userIdent;
+  final String name;
+  final String number;
+  final int group;
+  final int totalScore;
+
+  const EmployeeScoreGiveLogInfo({
+    required this.userIdent,
+    required this.name,
+    required this.number,
+    required this.group,
+    required this.totalScore,
+  });
+
+  factory EmployeeScoreGiveLogInfo.fromJson(Map<String, dynamic> json) {
+    return EmployeeScoreGiveLogInfo(
+      userIdent: json['userIdent'] as int? ?? 0,
+      name: json['name'] as String? ?? '',
+      number: json['number'] as String? ?? '',
+      group: json['group'] as int? ?? 0,
+      totalScore: json['totalScore'] as int? ?? 0,
+    );
+  }
+
+  @override
+  List<Object?> get props => [userIdent, name, group, totalScore];
+}
+
+/// 职员得分排行条目（计算排名后的）
+class EmployeeScoreRankingItem extends Equatable {
+  final int rank; // 排名（正数红榜，负数黑榜）
+  final int ident;
+  final String name;
+  final String number;
+  final int score; // 当前选中分组下的得分
+
+  const EmployeeScoreRankingItem({
+    required this.rank,
+    required this.ident,
+    required this.name,
+    required this.number,
+    required this.score,
+  });
+
+  bool get isRed => rank > 0;
+
+  @override
+  List<Object?> get props => [rank, ident, score];
+}

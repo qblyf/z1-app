@@ -1,5 +1,23 @@
 import 'package:equatable/equatable.dart';
 
+/// 字段在表单中的显示状态（对应 PWA InFormState）
+enum ZFormInFormState {
+  invisible('不可见', 0),
+  viewNoRequire('可见非必填', 1),
+  viewRequire('可见必填', 2);
+
+  final String label;
+  final int value;
+  const ZFormInFormState(this.label, this.value);
+
+  static ZFormInFormState fromValue(int? v) {
+    return ZFormInFormState.values.firstWhere(
+      (e) => e.value == v,
+      orElse: () => ZFormInFormState.viewNoRequire,
+    );
+  }
+}
+
 /// 字段类型
 enum ZFormFieldType {
   singleLineText('single-line-text', '单行文字'),
@@ -39,15 +57,22 @@ enum ZFormFieldType {
 }
 
 /// 表格列（字段定义）
+/// 对应 PWA TableColumn 类型
 class ZFormColumn extends Equatable {
   final int id;
   final String fieldType;
-  final String? name;
+  final String? name;       // 字段标题（对应 PWA title）
   final String? field;
   final String? placeholder;
-  final bool? isRequired;
+  final String? desc;       // 字段描述/说明
+  final String? unit;       // 单位（如"元"、"kg"）
+  final int? maxValue;      // 最大值（文本最大长度 / 附件最大数量）
+  final int? minValue;      // 最小值
+  final int? keepDecimalNum; // 小数位数
   final String? defaultValue;
-  final List<Map<String, dynamic>>? options; // for choice fields
+  final List<Map<String, dynamic>>? options; // 选项（单选/多选字段）
+  final List<String>? whiteList; // 白名单（如SKU ID列表，用于SKU/SPU选择）
+  final int? inFormState;   // 表单中状态（0=不可见, 1=可见非必填, 2=可见必填）
 
   const ZFormColumn({
     required this.id,
@@ -55,23 +80,44 @@ class ZFormColumn extends Equatable {
     this.name,
     this.field,
     this.placeholder,
-    this.isRequired,
+    this.desc,
+    this.unit,
+    this.maxValue,
+    this.minValue,
+    this.keepDecimalNum,
     this.defaultValue,
     this.options,
+    this.whiteList,
+    this.inFormState,
   });
+
+  /// 兼容 PWA title 字段
+  String get title => name ?? field ?? '字段';
+
+  /// 是否必填（综合 isRequired 和 inFormState）
+  bool get isRequiredField => inFormState == ZFormInFormState.viewRequire.value;
+
+  /// 是否可见
+  bool get isVisible => inFormState != ZFormInFormState.invisible.value;
 
   ZFormFieldType get fieldTypeInfo => ZFormFieldType.fromString(fieldType) ?? ZFormFieldType.singleLineText;
 
   factory ZFormColumn.fromJson(Map<String, dynamic> json) {
     return ZFormColumn(
-      id: json['id'] as int? ?? 0,
+      id: json['id'] is String ? int.tryParse(json['id'] as String) ?? 0 : (json['id'] as int? ?? 0),
       fieldType: json['fieldType'] as String? ?? '',
-      name: json['name'] as String?,
+      name: (json['name'] as String?) ?? (json['title'] as String?),
       field: json['field'] as String?,
       placeholder: json['placeholder'] as String?,
-      isRequired: json['isRequired'] as bool?,
+      desc: json['desc'] as String?,
+      unit: json['unit'] as String?,
+      maxValue: json['maxValue'] as int?,
+      minValue: json['minValue'] as int?,
+      keepDecimalNum: json['keepDecimalNum'] as int?,
       defaultValue: json['defaultValue'] as String?,
       options: (json['options'] as List<dynamic>?)?.cast<Map<String, dynamic>>(),
+      whiteList: (json['whiteList'] as List<dynamic>?)?.map((e) => e.toString()).toList(),
+      inFormState: json['inFormState'] as int?,
     );
   }
 
@@ -103,8 +149,10 @@ class ZFormFieldValue extends Equatable {
 class ZFormRecord extends Equatable {
   final int id;
   final String? tableName;
+  final int tableId;    // 表格ID
   final int formId;
   final int? createdBy;
+  final String? createdByName;
   final int? createdAt;
   final int? updatedAt;
   final List<ZFormFieldValue> fields;
@@ -112,8 +160,10 @@ class ZFormRecord extends Equatable {
   const ZFormRecord({
     required this.id,
     this.tableName,
+    this.tableId = 0,
     this.formId = 0,
     this.createdBy,
+    this.createdByName,
     this.createdAt,
     this.updatedAt,
     this.fields = const [],
@@ -123,12 +173,25 @@ class ZFormRecord extends Equatable {
     return ZFormRecord(
       id: json['id'] as int? ?? 0,
       tableName: json['tableName'] as String?,
+      tableId: json['tableID'] as int? ?? json['formID'] as int? ?? 0,
       formId: json['formID'] as int? ?? 0,
       createdBy: json['createdBy'] as int?,
+      createdByName: json['createdByName'] as String?,
       createdAt: json['createdAt'] as int?,
       updatedAt: json['updatedAt'] as int?,
       fields: (json['fields'] as List<dynamic>?)
               ?.map((e) => ZFormFieldValue.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          (json['columns'] as List<dynamic>?) // PWA 兼容：columns 格式
+              ?.map((e) {
+                final colId = e['columnID'] as int? ?? e['columnId'] as int? ?? 0;
+                final val = e['value'];
+                return ZFormFieldValue(
+                  columnId: colId,
+                  value: val?.toString(),
+                  values: (val as List<dynamic>?)?.map((v) => v.toString()).toList(),
+                );
+              })
               .toList() ??
           [],
     );
@@ -143,17 +206,27 @@ class ZForm extends Equatable {
   final int id;
   final String name;
   final String? desc;
-  final String? backImage;
+  final String? backImage;   // 背景图片
+  final String? coverImage;   // 封面图片
   final List<ZFormColumn> columns;
   final int? createdBy;
+  final int? status;          // 状态
+  final int? maxCommitNum;   // 最大提交次数
+  final bool? allowUpdate;    // 是否允许修改
+  final int? commitPermission; // 提交权限
 
   const ZForm({
     required this.id,
     required this.name,
     this.desc,
     this.backImage,
+    this.coverImage,
     this.columns = const [],
     this.createdBy,
+    this.status,
+    this.maxCommitNum,
+    this.allowUpdate,
+    this.commitPermission,
   });
 
   factory ZForm.fromJson(Map<String, dynamic> json) {
@@ -162,11 +235,16 @@ class ZForm extends Equatable {
       name: json['name'] as String? ?? '',
       desc: json['desc'] as String?,
       backImage: json['backImage'] as String?,
+      coverImage: json['coverImage'] as String? ?? json['cover_image'] as String?,
       columns: (json['tableColumns'] as List<dynamic>?)
               ?.map((e) => ZFormColumn.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
       createdBy: json['createdBy'] as int?,
+      status: json['status'] as int?,
+      maxCommitNum: json['maxCommitNum'] as int? ?? json['max_commit_num'] as int?,
+      allowUpdate: json['allowUpdate'] as bool? ?? json['allow_update'] as bool?,
+      commitPermission: json['commitPermission'] as int?,
     );
   }
 

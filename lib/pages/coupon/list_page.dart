@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/coupon_api.dart';
 import '../../models/coupon.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 final _couponListProvider = FutureProvider.autoDispose<List<Coupon>>((ref) async {
   return CouponApi().getList(
@@ -113,6 +114,18 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('我的卡券'),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,

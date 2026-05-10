@@ -1,14 +1,15 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../api/employee_api.dart';
 import '../../api/goods_request_api.dart';
 import '../../api/product_api.dart';
+import '../../api/warehouse_api.dart';
 import '../../models/product.dart';
-import '../../models/goods_request.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/common_widgets.dart';
 import '../clerk/product_select_page.dart';
+import '../../router/app_router.dart';
 
 /// 报货单创建页
 /// 对应 PWA /pages/path-d/goods-request.tsx
@@ -24,6 +25,7 @@ class GoodsRequestCreatePage extends ConsumerStatefulWidget {
 class _GoodsRequestCreatePageState extends ConsumerState<GoodsRequestCreatePage> {
   final GoodsRequestApi _api = GoodsRequestApi();
   final ProductApi _productApi = ProductApi();
+  final WarehouseApi _warehouseApi = WarehouseApi();
 
   /// 已添加的报货商品列表
   final List<_GoodsRequestItem> _items = [];
@@ -32,11 +34,46 @@ class _GoodsRequestCreatePageState extends ConsumerState<GoodsRequestCreatePage>
   /// SKU 名称缓存（避免重复查询）
   final Map<int, String> _skuNameCache = {};
 
+  /// 部门绑定仓库ID列表（对应 PWA warehouseIDs="boundToUserDept"）
+  List<int>? _warehouseIds;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadWarehouseIds());
+  }
+
+  /// 获取当前用户部门的绑定仓库ID列表
+  Future<void> _loadWarehouseIds() async {
+    final user = ref.read(currentUserProvider).value;
+    if (user == null) return;
+
+    int? deptId;
+    try {
+      final empApi = EmployeeApi();
+      final employees = await empApi.getByUserIdents([user.userIdent]);
+      if (employees.isNotEmpty) {
+        deptId = employees.first.currentDepartmentId;
+      }
+    } catch (_) {}
+
+    if (deptId == null) return;
+
+    try {
+      final ids = await _warehouseApi.getWarehouseIdsByMainDeptId(deptId);
+      if (mounted && ids.isNotEmpty) {
+        setState(() => _warehouseIds = ids);
+      }
+    } catch (_) {}
+  }
+
   /// 添加商品到报货单
   Future<void> _addProduct() async {
-    final result = await Navigator.of(context).push<Product>(_ CupertinoPageRoute(
-      builder: (_) => const ProductSelectPage(),
-    ));
+    final result = await Navigator.of(context).push<Product>(
+      CupertinoPageRoute(
+        builder: (_) => ProductSelectPage(warehouseIds: _warehouseIds),
+      ),
+    );
     if (result == null) return;
 
     // 获取 SKU 列表（如果商品有规格，需要让用户选择规格）
@@ -106,12 +143,25 @@ class _GoodsRequestCreatePageState extends ConsumerState<GoodsRequestCreatePage>
                           color: isSelected ? const Color(0xFF0A84FF) : CupertinoColors.systemGrey4.resolveFrom(ctx),
                         ),
                       ),
-                      child: Text(
-                        sku.name,
-                        style: TextStyle(
-                          color: isSelected ? const Color(0xFF0A84FF) : CupertinoColors.label.resolveFrom(ctx),
-                          fontSize: 14,
-                        ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            sku.name,
+                            style: TextStyle(
+                              color: isSelected ? const Color(0xFF0A84FF) : CupertinoColors.label.resolveFrom(ctx),
+                              fontSize: 14,
+                            ),
+                          ),
+                          if (sku.price > 0)
+                            Text(
+                              '¥${(sku.price / 100).toStringAsFixed(2)}',
+                              style: TextStyle(
+                                color: isSelected ? const Color(0xFFFF9500) : CupertinoColors.secondaryLabel.resolveFrom(ctx),
+                                fontSize: 11,
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   );
@@ -146,6 +196,7 @@ class _GoodsRequestCreatePageState extends ConsumerState<GoodsRequestCreatePage>
     ProductSku? sku,
     required String skuName,
   }) {
+    final price = sku?.price ?? product.price;
     final qtyController = TextEditingController(text: '1');
     final remarkController = TextEditingController();
     final skuId = sku?.id ?? 0;
@@ -191,6 +242,19 @@ class _GoodsRequestCreatePageState extends ConsumerState<GoodsRequestCreatePage>
                   ),
                 ],
               ),
+              if (price > 0) ...[
+                Row(
+                  children: [
+                    const Text('零售价', style: TextStyle(fontSize: 14)),
+                    const Spacer(),
+                    Text(
+                      '¥${(price / 100).toStringAsFixed(2)}',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFFF9500)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+              ],
               if (product.imageUrl != null) ...[
                 const SizedBox(height: 8),
                 SizedBox(
@@ -277,6 +341,7 @@ class _GoodsRequestCreatePageState extends ConsumerState<GoodsRequestCreatePage>
                         quantity: qty,
                         remarks: remarkController.text.trim().isEmpty ? null : remarkController.text.trim(),
                         productId: product.id,
+                        price: price,
                       ));
                     });
                     Navigator.pop(ctx);
@@ -455,8 +520,21 @@ class _GoodsRequestCreatePageState extends ConsumerState<GoodsRequestCreatePage>
 
     setState(() => _isSubmitting = true);
     try {
+      // 从 Employee API 获取当前用户当前部门
       final user = ref.read(currentUserProvider).value;
-      final departmentId = user?.departmentId;
+      if (user == null) {
+        _showTip('无法获取当前用户信息');
+        setState(() => _isSubmitting = false);
+        return;
+      }
+      int? departmentId;
+      try {
+        final empApi = EmployeeApi();
+        final employees = await empApi.getByUserIdents([user.userIdent]);
+        if (employees.isNotEmpty) {
+          departmentId = employees.first.currentDepartmentId;
+        }
+      } catch (_) {}
       if (departmentId == null) {
         _showTip('无法获取当前用户部门信息');
         setState(() => _isSubmitting = false);
@@ -507,6 +585,18 @@ class _GoodsRequestCreatePageState extends ConsumerState<GoodsRequestCreatePage>
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('商品报货单'),
         trailing: _isSubmitting
             ? const CupertinoActivityIndicator()
@@ -645,6 +735,7 @@ class _GoodsRequestItem {
   final int quantity;
   final String? remarks;
   final int productId;
+  final int price; // 零售价（单位：分）
 
   const _GoodsRequestItem({
     required this.skuId,
@@ -654,7 +745,10 @@ class _GoodsRequestItem {
     required this.quantity,
     this.remarks,
     required this.productId,
+    this.price = 0,
   });
+
+  String get formattedPrice => price > 0 ? '¥${(price / 100).toStringAsFixed(2)}' : '-';
 
   _GoodsRequestItem copyWith({
     int? skuId,
@@ -664,6 +758,7 @@ class _GoodsRequestItem {
     int? quantity,
     String? remarks,
     int? productId,
+    int? price,
   }) {
     return _GoodsRequestItem(
       skuId: skuId ?? this.skuId,
@@ -673,6 +768,7 @@ class _GoodsRequestItem {
       quantity: quantity ?? this.quantity,
       remarks: remarks ?? this.remarks,
       productId: productId ?? this.productId,
+      price: price ?? this.price,
     );
   }
 }
@@ -793,6 +889,18 @@ class _GoodsRequestItemCard extends StatelessWidget {
                                 ],
                               ),
                             ),
+                          ),
+                          const SizedBox(height: 6),
+                          // 价格行
+                          Row(
+                            children: [
+                              const Text('零售价:', style: TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel)),
+                              const Spacer(),
+                              Text(
+                                item.formattedPrice,
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFFFF9500)),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 8),
                           // 备注行

@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../api/product_api.dart';
 import '../../api/warehouse_api.dart';
+import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 商品报价单页面
 /// 对应 PWA /pages/path-d/product-quotation.tsx
@@ -44,7 +46,17 @@ class _ProductQuotationPageState extends ConsumerState<ProductQuotationPage> {
 
   Future<void> _loadUserWarehouses() async {
     try {
-      // 尝试获取当前用户管理的仓库
+      // 对应 PWA warehouseIDs="boundToUserDept"，获取用户部门的绑定仓库
+      final user = ref.read(currentUserProvider).value;
+      final deptId = user?.deptId;
+      if (deptId != null) {
+        final ids = await _warehouseApi.getWarehouseIdsByMainDeptId(deptId);
+        if (mounted && ids.isNotEmpty) {
+          setState(() => _currentWarehouseIds = ids);
+          return;
+        }
+      }
+      // 降级：获取当前用户管理的仓库
       final warehouses = await _warehouseApi.getManagerWarehouses();
       if (mounted && warehouses.isNotEmpty) {
         setState(() => _currentWarehouseIds = warehouses.map((w) => w.id).toList());

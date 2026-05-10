@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import '../../api/invoice_api.dart';
 import '../../models/invoice.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 发票详情页
 class InvoiceDetailPage extends StatefulWidget {
@@ -49,6 +50,18 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('发票详情'),
         previousPageTitle: '返回',
       ),

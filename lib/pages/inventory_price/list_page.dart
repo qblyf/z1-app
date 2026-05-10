@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/inventory_price_api.dart';
 import '../../models/inventory_price.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 final _stockListProvider = FutureProvider.autoDispose<List<StockPriceItem>>((ref) async {
   return inventoryPriceApi.list(includeNoStock: false);

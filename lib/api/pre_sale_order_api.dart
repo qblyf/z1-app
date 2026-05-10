@@ -173,11 +173,13 @@ class PreSaleOrderApi {
     int? department,
     String? remarks,
     String? emplRemarks,
+    int? preSaleProduct,
   }) async {
     final data = <String, dynamic>{'id': id};
     if (department != null) data['department'] = department;
     if (remarks != null) data['remarks'] = remarks;
     if (emplRemarks != null) data['emplRemarks'] = emplRemarks;
+    if (preSaleProduct != null) data['preSaleProduct'] = preSaleProduct;
 
     final res = await _client.post('/pre-sale-order/edit', data: data);
     return res.data['code'] == 10000;

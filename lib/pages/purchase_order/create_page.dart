@@ -2,7 +2,12 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../api/api_client.dart';
+import '../../api/vendor_api.dart';
+import '../../api/warehouse_api.dart';
+import '../../api/draft_api.dart';
+import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 采购商品数据
 class PurchaseProduct {
@@ -21,45 +26,6 @@ class PurchaseProduct {
   });
 }
 
-/// 供应商数据
-class Vendor {
-  final int id;
-  final String name;
-
-  const Vendor({
-    required this.id,
-    required this.name,
-  });
-}
-
-/// 仓库数据
-class Warehouse {
-  final int id;
-  final String name;
-
-  const Warehouse({
-    required this.id,
-    required this.name,
-  });
-}
-
-final _vendorListProvider = FutureProvider<List<Vendor>>((ref) async {
-  // 从后端获取供应商列表
-  return [
-    const Vendor(id: 1, name: '供应商A'),
-    const Vendor(id: 2, name: '供应商B'),
-    const Vendor(id: 3, name: '供应商C'),
-  ];
-});
-
-final _warehouseListProvider = FutureProvider<List<Warehouse>>((ref) async {
-  // 从后端获取仓库列表
-  return [
-    const Warehouse(id: 1, name: '中心仓库'),
-    const Warehouse(id: 2, name: '门店仓库A'),
-    const Warehouse(id: 3, name: '门店仓库B'),
-  ];
-});
 
 class PurchaseOrderCreatePage extends ConsumerStatefulWidget {
   const PurchaseOrderCreatePage({super.key});
@@ -72,10 +38,113 @@ class PurchaseOrderCreatePage extends ConsumerStatefulWidget {
 class _PurchaseOrderCreatePageState
     extends ConsumerState<PurchaseOrderCreatePage> {
   Vendor? _selectedVendor;
-  Warehouse? _selectedWarehouse;
+  WarehouseBase? _selectedWarehouse;
   final _remarkController = TextEditingController();
   final List<PurchaseProduct> _products = [];
   bool _isSubmitting = false;
+  bool _isLoadingDraft = false;
+  int? _draftId; // 非空表示从草稿加载
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadDraftIfNeeded());
+  }
+
+  Future<void> _loadDraftIfNeeded() async {
+    // 从路由参数获取草稿ID
+    final draftIdStr = GoRouterState.of(context).uri.queryParameters['draftId'];
+    if (draftIdStr == null) return;
+    final draftId = int.tryParse(draftIdStr);
+    if (draftId == null) return;
+
+    setState(() => _isLoadingDraft = true);
+    try {
+      final draft = await DraftApi().getDetail(draftId);
+      if (draft == null || !mounted) return;
+
+      final data = draft.parseData();
+      // 加载供应商
+      final vendorId = data['vendorID'] as int?;
+      final vendorName = data['vendorName'] as String?;
+      if (vendorId != null) {
+        _selectedVendor = Vendor(id: vendorId, name: vendorName ?? '供应商');
+      }
+      // 加载仓库
+      final warehouseId = data['warehouseID'] as int?;
+      final warehouseName = data['warehouseName'] as String?;
+      if (warehouseId != null) {
+        _selectedWarehouse = WarehouseBase(
+          id: warehouseId,
+          name: warehouseName ?? '仓库',
+          cateId: 0,
+        );
+      }
+      // 加载备注
+      _remarkController.text = data['remarks'] as String? ?? '';
+      // 加载商品
+      final productsData = data['products'] as List<dynamic>? ?? [];
+      _products.clear();
+      for (final p in productsData) {
+        final pd = p as Map<String, dynamic>;
+        _products.add(PurchaseProduct(
+          productId: pd['productID'] as int? ?? pd['productId'] as int? ?? 0,
+          productName: pd['productName'] as String? ?? '商品',
+          thumbnail: pd['thumbnail'] as String?,
+          quantity: pd['quantity'] as int? ?? 1,
+          price: pd['price'] as int? ?? 0,
+        ));
+      }
+      setState(() {
+        _draftId = draftId;
+        _isLoadingDraft = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingDraft = false);
+    }
+  }
+
+  Future<void> _saveDraft() async {
+    if (_products.isEmpty) {
+      _showToast('请先添加商品');
+      return;
+    }
+    final currentUser = ref.read(currentUserProvider).value;
+    try {
+      final draftApi = DraftApi();
+      final data = <String, dynamic>{
+        'vendorID': _selectedVendor?.id,
+        'vendorName': _selectedVendor?.name,
+        'warehouseID': _selectedWarehouse?.id,
+        'warehouseName': _selectedWarehouse?.name,
+        'remarks': _remarkController.text.trim(),
+        'products': _products.map((p) => {
+          'productID': p.productId,
+          'productName': p.productName,
+          'thumbnail': p.thumbnail,
+          'quantity': p.quantity,
+          'price': p.price,
+        }).toList(),
+      };
+      if (_draftId != null) {
+        await draftApi.update(id: _draftId!, data: data, remarks: _remarkController.text.trim());
+        if (mounted) _showToast('草稿已更新');
+      } else {
+        final newId = await draftApi.save(
+          type: DraftTypeStr.purchaseOrder.value,
+          users: currentUser != null ? [currentUser.userIdent] : [],
+          data: data,
+          remarks: _remarkController.text.trim(),
+        );
+        if (mounted) {
+          setState(() => _draftId = newId);
+          _showToast('草稿已保存');
+        }
+      }
+    } catch (e) {
+      if (mounted) _showToast('保存草稿失败: $e');
+    }
+  }
 
   @override
   void dispose() {
@@ -227,7 +296,12 @@ class _PurchaseOrderCreatePageState
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('新建采购订单'),
+        middle: Text(_draftId != null ? '编辑采购订单' : '新建采购订单'),
+        leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Text('草稿'),
+          onPressed: () => _saveDraft(),
+        ),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: _isSubmitting ? null : _submit,
@@ -239,6 +313,18 @@ class _PurchaseOrderCreatePageState
       child: SafeArea(
         child: Column(
           children: [
+            if (_isLoadingDraft)
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CupertinoActivityIndicator(),
+                    SizedBox(width: 8),
+                    Text('正在加载草稿...'),
+                  ],
+                ),
+              ),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(AppSpacing.lg),
@@ -630,20 +716,71 @@ class _QuantityButton extends StatelessWidget {
   }
 }
 
-/// 供应商选择弹窗
-class _VendorSheet extends ConsumerWidget {
+/// 供应商选择弹窗（真实API + 搜索）
+class _VendorSheet extends StatefulWidget {
   final void Function(Vendor) onSelected;
 
   const _VendorSheet({required this.onSelected});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final vendors = ref.watch(_vendorListProvider);
+  State<_VendorSheet> createState() => _VendorSheetState();
+}
 
+class _VendorSheetState extends State<_VendorSheet> {
+  final _searchController = TextEditingController();
+  List<Vendor> _allVendors = [];
+  List<Vendor> _filtered = [];
+  bool _loading = true;
+  String _keyword = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVendors();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadVendors() async {
+    setState(() => _loading = true);
+    try {
+      final vendors = await VendorApi().list(limit: 500);
+      if (mounted) {
+        setState(() {
+          _allVendors = vendors;
+          _filtered = vendors;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _onSearch(String v) {
+    _keyword = v.trim().toLowerCase();
+    if (_keyword.isEmpty) {
+      setState(() => _filtered = _allVendors);
+    } else {
+      setState(() {
+        _filtered = _allVendors.where((vendor) {
+          return vendor.name.toLowerCase().contains(_keyword) ||
+              (vendor.spell?.toLowerCase().contains(_keyword) ?? false) ||
+              (vendor.number?.toLowerCase().contains(_keyword) ?? false) ||
+              (vendor.phone?.toLowerCase().contains(_keyword) ?? false);
+        }).toList();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.lg,
-      ),
+      height: MediaQuery.of(context).size.height * 0.7,
       decoration: const BoxDecoration(
         color: CupertinoColors.systemBackground,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -651,8 +788,8 @@ class _VendorSheet extends ConsumerWidget {
       child: SafeArea(
         top: false,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
+            // 头部
             Container(
               padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.lg, vertical: AppSpacing.md),
@@ -672,51 +809,103 @@ class _VendorSheet extends ConsumerWidget {
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Icon(CupertinoIcons.xmark_circle_fill,
-                        color:
-                            CupertinoColors.tertiaryLabel.resolveFrom(context)),
+                        color: CupertinoColors.tertiaryLabel.resolveFrom(context)),
                   ),
                 ],
               ),
             ),
-            vendors.when(
-              data: (list) => Column(
-                children: list.map((v) {
-                  return CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    onPressed: () {
-                      onSelected(v);
-                      Navigator.pop(context);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.lg, vertical: AppSpacing.md),
-                      child: Row(
-                        children: [
-                          Icon(
-                            CupertinoIcons.person_fill,
-                            size: 20,
-                            color: AppColors.primary,
+            // 搜索框
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: CupertinoSearchTextField(
+                controller: _searchController,
+                placeholder: '搜索供应商名称/拼音/编号',
+                onChanged: _onSearch,
+              ),
+            ),
+            // 列表
+            Expanded(
+              child: _loading
+                  ? const Center(child: CupertinoActivityIndicator())
+                  : _filtered.isEmpty
+                      ? Center(
+                          child: Text(
+                            _keyword.isEmpty ? '暂无供应商数据' : '未找到匹配的供应商',
+                            style: AppText.body.copyWith(
+                              color: CupertinoColors.secondaryLabel,
+                            ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(child: Text(v.name, style: AppText.body)),
-                          Icon(CupertinoIcons.chevron_right,
-                              size: 14,
-                              color:
-                                  CupertinoColors.tertiaryLabel.resolveFrom(context)),
-                        ],
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              loading: () => const Padding(
-                padding: EdgeInsets.all(AppSpacing.xl),
-                child: CupertinoActivityIndicator(),
-              ),
-              error: (_, __) => const Padding(
-                padding: EdgeInsets.all(AppSpacing.xl),
-                child: Text('加载失败'),
-              ),
+                        )
+                      : ListView.builder(
+                          itemCount: _filtered.length,
+                          itemBuilder: (context, index) {
+                            final v = _filtered[index];
+                            return CupertinoButton(
+                              padding: EdgeInsets.zero,
+                              onPressed: () {
+                                widget.onSelected(v);
+                                Navigator.pop(context);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.lg,
+                                    vertical: AppSpacing.md),
+                                decoration: BoxDecoration(
+                                  border: Border(
+                                    bottom: BorderSide(
+                                      color: CupertinoColors.separator
+                                          .resolveFrom(context),
+                                      width: 0.5,
+                                    ),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary
+                                            .withValues(alpha: 0.1),
+                                        borderRadius:
+                                            BorderRadius.circular(8),
+                                      ),
+                                      child: Icon(
+                                        CupertinoIcons.person_fill,
+                                        size: 18,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(v.name, style: AppText.body),
+                                          if (v.number != null)
+                                            Text(
+                                              '编号: ${v.number}',
+                                              style: AppText.caption.copyWith(
+                                                color: CupertinoColors
+                                                    .secondaryLabel,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    Icon(
+                                      CupertinoIcons.chevron_right,
+                                      size: 14,
+                                      color: CupertinoColors.tertiaryLabel
+                                          .resolveFrom(context),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
             ),
           ],
         ),
@@ -725,20 +914,92 @@ class _VendorSheet extends ConsumerWidget {
   }
 }
 
-/// 仓库选择弹窗
-class _WarehouseSheet extends ConsumerWidget {
-  final void Function(Warehouse) onSelected;
+/// 仓库选择弹窗（真实API + 两级分类导航）
+class _WarehouseSheet extends StatefulWidget {
+  final void Function(WarehouseBase) onSelected;
 
   const _WarehouseSheet({required this.onSelected});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final warehouses = ref.watch(_warehouseListProvider);
+  State<_WarehouseSheet> createState() => _WarehouseSheetState();
+}
 
+class _WarehouseSheetState extends State<_WarehouseSheet> {
+  List<WarehouseBase> _allWarehouses = [];
+  List<WarehouseCate> _allCates = [];
+  WarehouseCate? _selectedCate;
+  bool _loading = true;
+  String _searchKeyword = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _loading = true);
+    try {
+      final result = await WarehouseApi().listBase();
+      if (mounted) {
+        setState(() {
+          _allWarehouses = result.warehouses;
+          _allCates = result.cates;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  /// 一级分类：pid == 0 或链中不含其他分类的顶级分类
+  List<WarehouseCate> get _topLevelCates {
+    return _allCates.where((c) {
+      // 找顶层分类：pid==0 或者其父分类不在列表中
+      if (c.pid == 0) return true;
+      final parent = _allCates.where((p) => p.id == c.pid).firstOrNull;
+      return parent == null;
+    }).toList();
+  }
+
+  /// 当前分类下的仓库（不含已选分类本身）
+  List<WarehouseBase> get _visibleWarehouses {
+    if (_selectedCate == null) {
+      // 顶层：显示所有分类下的仓库，但按分类过滤
+      return _filteredWarehouses;
+    }
+    // 子级：显示当前分类及其子分类下的仓库
+    final cateIds = _collectDescendantCateIds(_selectedCate!.id);
+    cateIds.add(_selectedCate!.id);
+    return _filteredWarehouses
+        .where((w) => cateIds.contains(w.cateId))
+        .toList();
+  }
+
+  List<WarehouseBase> get _filteredWarehouses {
+    if (_searchKeyword.isEmpty) return _allWarehouses;
+    final kw = _searchKeyword.toLowerCase();
+    return _allWarehouses.where((w) {
+      return w.name.toLowerCase().contains(kw) ||
+          (w.spell?.toLowerCase().contains(kw) ?? false) ||
+          (w.number?.toLowerCase().contains(kw) ?? false);
+    }).toList();
+  }
+
+  Set<int> _collectDescendantCateIds(int pid) {
+    final result = <int>{};
+    for (final c in _allCates.where((c) => c.pid == pid)) {
+      result.add(c.id);
+      result.addAll(_collectDescendantCateIds(c.id));
+    }
+    return result;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.lg,
-      ),
+      height: MediaQuery.of(context).size.height * 0.7,
       decoration: const BoxDecoration(
         color: CupertinoColors.systemBackground,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -746,8 +1007,8 @@ class _WarehouseSheet extends ConsumerWidget {
       child: SafeArea(
         top: false,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
+            // 头部
             Container(
               padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.lg, vertical: AppSpacing.md),
@@ -760,62 +1021,187 @@ class _WarehouseSheet extends ConsumerWidget {
                 ),
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('选择仓库',
-                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                  if (_selectedCate != null)
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () => setState(() => _selectedCate = null),
+                      child: Icon(
+                        CupertinoIcons.chevron_left,
+                        size: 20,
+                        color: CupertinoColors.label.resolveFrom(context),
+                      ),
+                    ),
+                  Expanded(
+                    child: Text(
+                      _selectedCate?.name ?? '选择仓库分类',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Icon(CupertinoIcons.xmark_circle_fill,
-                        color:
-                            CupertinoColors.tertiaryLabel.resolveFrom(context)),
+                        color: CupertinoColors.tertiaryLabel.resolveFrom(context)),
                   ),
                 ],
               ),
             ),
-            warehouses.when(
-              data: (list) => Column(
-                children: list.map((w) {
-                  return CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    onPressed: () {
-                      onSelected(w);
-                      Navigator.pop(context);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.lg, vertical: AppSpacing.md),
-                      child: Row(
-                        children: [
-                          Icon(
-                            CupertinoIcons.building_2_fill,
-                            size: 20,
-                            color: AppColors.primary,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(child: Text(w.name, style: AppText.body)),
-                          Icon(CupertinoIcons.chevron_right,
-                              size: 14,
-                              color:
-                                  CupertinoColors.tertiaryLabel.resolveFrom(context)),
-                        ],
-                      ),
-                    ),
-                  );
-                }).toList(),
+            // 搜索框
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: CupertinoSearchTextField(
+                placeholder: '搜索仓库名称/编号/拼音',
+                onChanged: (v) => setState(() => _searchKeyword = v),
               ),
-              loading: () => const Padding(
-                padding: EdgeInsets.all(AppSpacing.xl),
-                child: CupertinoActivityIndicator(),
-              ),
-              error: (_, __) => const Padding(
-                padding: EdgeInsets.all(AppSpacing.xl),
-                child: Text('加载失败'),
-              ),
+            ),
+            // 内容区
+            Expanded(
+              child: _loading
+                  ? const Center(child: CupertinoActivityIndicator())
+                  : _searchKeyword.isNotEmpty
+                      ? _buildWarehouseList(_visibleWarehouses)
+                      : (_selectedCate == null
+                          ? _buildCategoryGrid(_topLevelCates)
+                          : _buildWarehouseList(_visibleWarehouses)),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildCategoryGrid(List<WarehouseCate> cates) {
+    if (cates.isEmpty) {
+      return Center(
+        child: Text(
+          '暂无分类',
+          style: AppText.body.copyWith(color: CupertinoColors.secondaryLabel),
+        ),
+      );
+    }
+    return GridView.builder(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        childAspectRatio: 1,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+      ),
+      itemCount: cates.length,
+      itemBuilder: (context, index) {
+        final cate = cates[index];
+        return GestureDetector(
+          onTap: () => setState(() => _selectedCate = cate),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  CupertinoIcons.folder_fill,
+                  color: AppColors.primary,
+                  size: 28,
+                ),
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text(
+                    cate.name,
+                    style: AppText.caption.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildWarehouseList(List<WarehouseBase> warehouses) {
+    if (warehouses.isEmpty) {
+      return Center(
+        child: Text(
+          _searchKeyword.isNotEmpty ? '未找到匹配的仓库' : '该分类下暂无仓库',
+          style: AppText.body.copyWith(color: CupertinoColors.secondaryLabel),
+        ),
+      );
+    }
+    return ListView.builder(
+      itemCount: warehouses.length,
+      itemBuilder: (context, index) {
+        final w = warehouses[index];
+        return CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () {
+            widget.onSelected(w);
+            Navigator.pop(context);
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: CupertinoColors.separator.resolveFrom(context),
+                  width: 0.5,
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    CupertinoIcons.building_2_fill,
+                    size: 18,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(w.name, style: AppText.body),
+                      if (w.number != null)
+                        Text(
+                          '编号: ${w.number}',
+                          style: AppText.caption.copyWith(
+                            color: CupertinoColors.secondaryLabel,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  CupertinoIcons.chevron_right,
+                  size: 14,
+                  color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

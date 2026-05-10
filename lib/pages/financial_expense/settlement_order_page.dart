@@ -5,6 +5,7 @@ import '../../api/financial_expense_api.dart';
 import '../../models/financial_expense.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 财务结算单页面
 /// 对应 PWA /pages/path-d/financial-expense/settlement-order.tsx
@@ -295,6 +296,18 @@ class _SettlementOrderPageState extends ConsumerState<SettlementOrderPage> {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('财务结算单'),
         trailing: _isSubmitting ? const CupertinoActivityIndicator() : null,
       ),

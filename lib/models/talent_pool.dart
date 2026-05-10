@@ -38,13 +38,13 @@ enum Sex {
 
 /// 学历枚举
 enum Education {
-  初中及以下('junior'),
-  高中('senior'),
-  中专('technical'),
-  大专('college'),
-  本科('bachelor'),
-  硕士('master'),
-  博士('doctor');
+  juniorHigh('junior'),
+  seniorHigh('senior'),
+  technicalSchool('technical'),
+  associate('college'),
+  bachelor('bachelor'),
+  master('master'),
+  doctor('doctor');
 
   final String value;
   const Education(this.value);
@@ -59,19 +59,19 @@ enum Education {
 
   String get label {
     switch (this) {
-      case Education.初中及以下:
+      case Education.juniorHigh:
         return '初中及以下';
-      case Education.高中:
+      case Education.seniorHigh:
         return '高中';
-      case Education.中专:
+      case Education.technicalSchool:
         return '中专';
-      case Education.大专:
+      case Education.associate:
         return '大专';
-      case Education.本科:
+      case Education.bachelor:
         return '本科';
-      case Education.硕士:
+      case Education.master:
         return '硕士';
-      case Education.博士:
+      case Education.doctor:
         return '博士';
     }
   }
@@ -79,8 +79,8 @@ enum Education {
 
 /// 学历性质枚举
 enum EducationType {
-  全日制('full_time'),
-  非全日制('part_time');
+  fullTime('full_time'),
+  partTime('part_time');
 
   final String value;
   const EducationType(this.value);
@@ -95,9 +95,9 @@ enum EducationType {
 
   String get label {
     switch (this) {
-      case EducationType.全日制:
+      case EducationType.fullTime:
         return '全日制';
-      case EducationType.非全日制:
+      case EducationType.partTime:
         return '非全日制';
     }
   }

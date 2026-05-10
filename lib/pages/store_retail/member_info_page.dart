@@ -6,6 +6,7 @@ import '../../models/user.dart';
 import '../../models/store_retail.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../router/app_router.dart';
 
 /// 会员信息编辑页 Provider
 final memberInfoProvider =

@@ -292,4 +292,72 @@ class EmployeeScoreApi {
     }
     return null;
   }
+
+  // ── 分组排名（对应 PWA statistic.tsx） ───────────────────────────────
+
+  /// 获取工分类别分组列表
+  Future<List<DepartmentEmployeeScoreClassGroup>> getScoreClassGroupList() async {
+    // 后端 GET /department-employee-score-class-group/list
+    final response = await _client.get('/department-employee-score-class-group/list');
+    final res = response.data['res'] ?? response.data;
+    if (res is List) {
+      return res.map((e) => DepartmentEmployeeScoreClassGroup.fromJson(e as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
+  /// 获取工分类别分组详情（按ID批量）
+  Future<List<DepartmentEmployeeScoreClassGroup>> getScoreClassGroupDetail(List<int> ids) async {
+    if (ids.isEmpty) return [];
+    // 后端 GET /department-employee-score-class-group/detail?ids=X,Y,Z
+    final response = await _client.get(
+      '/department-employee-score-class-group/detail',
+      queryParameters: {'ids': ids.join(',')},
+    );
+    final res = response.data['res'] ?? response.data;
+    if (res is List) {
+      return res.map((e) => DepartmentEmployeeScoreClassGroup.fromJson(e as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
+  /// 获取工分类别列表（支持过滤）
+  Future<List<DepartmentEmployeeScoreClass>> getScoreClassList({bool? isHide}) async {
+    // 后端 GET /department-employee-score-class/list
+    final queryParams = <String, dynamic>{};
+    if (isHide != null) queryParams['isHide'] = isHide;
+    final response = await _client.get(
+      '/department-employee-score-class/list',
+      queryParameters: queryParams.isNotEmpty ? queryParams : null,
+    );
+    final res = response.data['res'] ?? response.data['list'] ?? response.data;
+    if (res is List) {
+      return res.map((e) => DepartmentEmployeeScoreClass.fromJson(e as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
+  /// 获取职员得分统计（分组维度）
+  /// 对应 PWA: departmentEmployeeScoreGiveLogInfo
+  /// GET /department-employee-score-give-log/score-info?deptIDs=X&groupIDs=Y,Z
+  Future<List<EmployeeScoreGiveLogInfo>> getScoreGiveLogInfo({
+    List<int>? deptIds,
+    required List<int> groupIds,
+  }) async {
+    final queryParams = <String, dynamic>{};
+    if (deptIds != null && deptIds.isNotEmpty) {
+      queryParams['deptIDs'] = deptIds;
+    }
+    if (groupIds.isNotEmpty) queryParams['groupIDs'] = groupIds;
+
+    final response = await _client.get(
+      '/department-employee-score-give-log/score-info',
+      queryParameters: queryParams,
+    );
+    final res = response.data['res'] ?? response.data;
+    if (res is List) {
+      return res.map((e) => EmployeeScoreGiveLogInfo.fromJson(e as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
 }

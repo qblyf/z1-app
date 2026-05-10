@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../providers/employee_score_providers.dart';
 import '../../models/employee_score.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 申报管理页面（管理员查看/审批申报）
 class ManagementPage extends ConsumerStatefulWidget {

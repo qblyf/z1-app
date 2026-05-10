@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../providers/employee_score_providers.dart';
 import '../../models/employee_score.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 员工积分调整首页
 class EmployeeScoreAdjustmentPage extends ConsumerWidget {
@@ -17,6 +18,18 @@ class EmployeeScoreAdjustmentPage extends ConsumerWidget {
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
         middle: const Text('积分管理'),
+        leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
           child: const Icon(CupertinoIcons.chart_bar),
@@ -48,16 +61,16 @@ class EmployeeScoreAdjustmentPage extends ConsumerWidget {
                     child: _MenuCard(
                       icon: CupertinoIcons.arrow_up_circle,
                       label: '积分发放',
-                      color: const Color(0xFF30D158),
+                      color: AppColors.success,
                       onTap: () => context.push('/employee-score/distribution'),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: _MenuCard(
-                      icon: CupertinoIcons.doc_text,
-                      label: '申报管理',
-                      color: const Color(0xFF0A84FF),
+                      icon: CupertinoIcons.arrow_down_circle,
+                      label: '积分扣减',
+                      color: AppColors.error,
                       onTap: () => context.push('/employee-score/management'),
                     ),
                   ),
@@ -70,28 +83,19 @@ class EmployeeScoreAdjustmentPage extends ConsumerWidget {
                 children: [
                   Expanded(
                     child: _MenuCard(
-                      icon: CupertinoIcons.star,
-                      label: '积分申报',
-                      color: const Color(0xFFFF9500),
+                      icon: CupertinoIcons.doc_text,
+                      label: '积分申请',
+                      color: AppColors.primary,
                       onTap: () => context.push('/employee-score/apply'),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: _MenuCard(
-                      icon: CupertinoIcons.chart_bar_square,
-                      label: '红黑榜',
-                      color: const Color(0xFFBF5AF2),
+                      icon: CupertinoIcons.chart_bar_alt_fill,
+                      label: '积分排行',
+                      color: AppColors.warning,
                       onTap: () => context.push('/employee-score/ranking'),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: _MenuCard(
-                      icon: CupertinoIcons.list_bullet,
-                      label: '赏罚明细',
-                      color: const Color(0xFFFF6B6B),
-                      onTap: () => context.push('/employee-score/reward-punishment-details'),
                     ),
                   ),
                 ],
@@ -99,10 +103,16 @@ class EmployeeScoreAdjustmentPage extends ConsumerWidget {
 
               const SizedBox(height: AppSpacing.lg),
 
-              // 近期发放记录
-              Text('近期发放记录', style: AppText.label),
-              const SizedBox(height: AppSpacing.sm),
-              _RecentGiveLogSection(),
+              // 奖惩记录
+              Text('奖惩记录', style: AppText.label),
+              const SizedBox(height: AppSpacing.md),
+
+              _MenuCard(
+                icon: CupertinoIcons.exclamationmark_shield,
+                label: '奖惩明细',
+                color: AppColors.accent,
+                onTap: () => context.push('/employee-score/reward-punishment-details'),
+              ),
             ],
           ),
         ),
@@ -111,18 +121,21 @@ class EmployeeScoreAdjustmentPage extends ConsumerWidget {
   }
 }
 
-/// 积分余额卡片
 class _ScoreBalanceCard extends StatelessWidget {
   final CurrentUserScore? score;
 
   const _ScoreBalanceCard({this.score});
 
   factory _ScoreBalanceCard.loading() {
-    return _ScoreBalanceCard();
+    return _ScoreBalanceCard(
+      score: null,
+    );
   }
 
   factory _ScoreBalanceCard.error() {
-    return const _ScoreBalanceCard();
+    return _ScoreBalanceCard(
+      score: null,
+    );
   }
 
   @override
@@ -131,92 +144,45 @@ class _ScoreBalanceCard extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF0A84FF), Color(0xFF5E5CE6)],
+          colors: [Color(0xFF5856D6), Color(0xFFAF52DE)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(AppRadius.xl),
-        boxShadow: AppShadows.elevated,
+        boxShadow: AppShadows.card,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: CupertinoColors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  CupertinoIcons.star_fill,
-                  color: CupertinoColors.white,
-                  size: 24,
-                ),
+              const Icon(
+                CupertinoIcons.star_fill,
+                color: CupertinoColors.white,
+                size: 24,
               ),
-              const SizedBox(width: 12),
-              const Text(
-                '我的积分余额',
-                style: TextStyle(
-                  color: CupertinoColors.white,
-                  fontSize: 14,
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                '我的积分',
+                style: AppText.body.copyWith(
+                  color: CupertinoColors.white.withValues(alpha: 0.9),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            score != null ? '${score!.getScores}' : '--',
+            style: const TextStyle(
+              fontSize: 40,
+              fontWeight: FontWeight.bold,
+              color: CupertinoColors.white,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
           Row(
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${score?.getScores ?? '-'}',
-                      style: const TextStyle(
-                        color: CupertinoColors.white,
-                        fontSize: 36,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Text(
-                      '可发放积分',
-                      style: TextStyle(
-                        color: CupertinoColors.white,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                width: 1,
-                height: 48,
-                color: CupertinoColors.white.withValues(alpha: 0.3),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${score?.giveOutScores ?? '-'}',
-                      style: const TextStyle(
-                        color: CupertinoColors.white,
-                        fontSize: 36,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Text(
-                      '已发放积分',
-                      style: TextStyle(
-                        color: CupertinoColors.white,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              _ScoreItem(label: '已发放', value: score?.giveOutScores.toString() ?? '--'),
             ],
           ),
         ],
@@ -225,7 +191,38 @@ class _ScoreBalanceCard extends StatelessWidget {
   }
 }
 
-/// 功能菜单卡片
+class _ScoreItem extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _ScoreItem({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: CupertinoColors.white.withValues(alpha: 0.7),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: CupertinoColors.white,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _MenuCard extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -244,7 +241,7 @@ class _MenuCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
           color: CupertinoColors.white,
           borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -253,145 +250,24 @@ class _MenuCard extends StatelessWidget {
         child: Column(
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
+                color: color.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(AppRadius.md),
               ),
-              child: Icon(icon, color: color, size: 28),
+              child: Icon(icon, color: color, size: 24),
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
               label,
-              style: AppText.body.copyWith(fontWeight: FontWeight.w600),
+              style: AppText.body.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ),
       ),
     );
-  }
-}
-
-/// 近期发放记录
-class _RecentGiveLogSection extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final api = ref.read(employeeScoreApiProvider);
-
-    return FutureBuilder<List<ScoreGiveLog>>(
-      future: api.getGiveLogList(limit: 5),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Container(
-            padding: const EdgeInsets.all(AppSpacing.xl),
-            child: const Center(child: CupertinoActivityIndicator()),
-          );
-        }
-
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return Container(
-            padding: const EdgeInsets.all(AppSpacing.xl),
-            decoration: BoxDecoration(
-              color: CupertinoColors.white,
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              boxShadow: AppShadows.card,
-            ),
-            child: Center(
-              child: Column(
-                children: [
-                  Icon(
-                    CupertinoIcons.doc_text,
-                    color: AppColors.textTertiary,
-                    size: 32,
-                  ),
-                  const SizedBox(height: 8),
-                  Text('暂无发放记录', style: AppText.caption),
-                ],
-              ),
-            ),
-          );
-        }
-
-        return Container(
-          decoration: BoxDecoration(
-            color: CupertinoColors.white,
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            boxShadow: AppShadows.card,
-          ),
-          child: Column(
-            children: [
-              ...snapshot.data!.map((log) => _GiveLogItem(log: log)),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _GiveLogItem extends StatelessWidget {
-  final ScoreGiveLog log;
-
-  const _GiveLogItem({required this.log});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.md,
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: const Color(0xFF30D158).withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                log.employeeName?.substring(0, 1) ?? '?',
-                style: TextStyle(
-                  color: const Color(0xFF30D158),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  log.employeeName ?? '未知员工',
-                  style: AppText.body.copyWith(fontWeight: FontWeight.w600),
-                ),
-                Text(
-                  '${log.className ?? '积分'} · ${_formatTime(log.givenAt)}',
-                  style: AppText.caption,
-                ),
-              ],
-            ),
-          ),
-          Text(
-            '+${log.score}',
-            style: TextStyle(
-              color: const Color(0xFF30D158),
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatTime(int timestamp) {
-    if (timestamp == 0) return '-';
-    final dt = DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
-    return '${dt.month}/${dt.day} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
   }
 }

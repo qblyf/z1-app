@@ -5,6 +5,7 @@ import '../../api/stocktaking_api.dart';
 import '../../api/warehouse_api.dart';
 import '../../models/stocktaking.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 盘库记录列表页（盘库结果查询）
 /// 对应 PWA /pages/path-d/stocktaking-log-list.tsx

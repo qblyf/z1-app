@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/store_inspection_api.dart';
 import '../../models/store_inspection.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 巡店/自检 - 记录列表页
 /// 对应 PWA /pages/path-d/store-inspection/logs.tsx

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../api/calendar_api.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 行事历 - 已过期列表页
 /// 对应 PWA /pages/path-d/my-calendar/expired-list.tsx

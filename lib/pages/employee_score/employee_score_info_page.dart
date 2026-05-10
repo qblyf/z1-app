@@ -4,6 +4,7 @@ import '../../api/employee_score_api.dart';
 import '../../models/employee_score.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../router/app_router.dart';
 
 /// 员工积分申报详情页面
 /// 对应 PWA: /employee-score/info
@@ -36,6 +37,18 @@ class _EmployeeScoreInfoPageState extends ConsumerState<EmployeeScoreInfoPage> {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('申报详情'),
         trailing: detailAsync.whenOrNull(
           data: (apply) => apply.status == 1

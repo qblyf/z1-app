@@ -106,6 +106,18 @@ class _AccountingVoucherListPageState extends ConsumerState<AccountingVoucherLis
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('会计凭证'),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
@@ -140,7 +152,10 @@ class _AccountingVoucherListPageState extends ConsumerState<AccountingVoucherLis
                       separatorBuilder: (_, __) => Container(height: 1, margin: const EdgeInsets.symmetric(horizontal: 16), color: CupertinoColors.separator.resolveFrom(context)),
                       itemBuilder: (context, index) {
                         if (index >= _allItems.length) {
-                          return const Padding(padding: EdgeInsets.all(16), child: Center(child: CupertinoActivityIndicator()));
+                          return const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Center(child: CupertinoActivityIndicator()),
+                          );
                         }
                         return _VoucherRow(item: _allItems[index]);
                       },
@@ -179,54 +194,55 @@ class _VoucherRow extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         color: CupertinoColors.white,
         child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: _stateColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(4),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: _stateColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    item.state.label,
+                    style: TextStyle(fontSize: 11, color: _stateColor, fontWeight: FontWeight.w500),
+                  ),
                 ),
-                child: Text(
-                  item.state.label,
-                  style: TextStyle(fontSize: 11, color: _stateColor, fontWeight: FontWeight.w500),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF5E5CE6).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    item.displayNumber,
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF5E5CE6), fontWeight: FontWeight.w600),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF5E5CE6).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  item.displayNumber,
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF5E5CE6), fontWeight: FontWeight.w600),
-                ),
-              ),
-              const SizedBox(width: 8),
-              if (item.period.isNotEmpty)
+                const SizedBox(width: 8),
+                if (item.period.isNotEmpty)
+                  Text(
+                    item.period,
+                    style: AppText.caption.copyWith(color: CupertinoColors.secondaryLabel.resolveFrom(context)),
+                  ),
+                const Spacer(),
                 Text(
-                  item.period,
-                  style: AppText.caption.copyWith(color: CupertinoColors.secondaryLabel.resolveFrom(context)),
+                  _formatDate(item.createdAt),
+                  style: AppText.caption.copyWith(color: CupertinoColors.tertiaryLabel.resolveFrom(context)),
                 ),
-              const Spacer(),
+              ],
+            ),
+            if (item.remarks != null && item.remarks!.isNotEmpty) ...[
+              const SizedBox(height: 6),
               Text(
-                _formatDate(item.createdAt),
-                style: AppText.caption.copyWith(color: CupertinoColors.tertiaryLabel.resolveFrom(context)),
+                item.remarks!,
+                style: AppText.caption.copyWith(color: CupertinoColors.secondaryLabel.resolveFrom(context)),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
-          ),
-          if (item.remarks != null && item.remarks!.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              item.remarks!,
-              style: AppText.caption.copyWith(color: CupertinoColors.secondaryLabel.resolveFrom(context)),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
           ],
         ),
       ),

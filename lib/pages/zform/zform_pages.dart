@@ -1,9 +1,16 @@
+import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:dio/dio.dart';
 import '../../api/zform_api.dart';
 import '../../models/zform.dart';
+import '../../config/api_config.dart';
+import '../../services/token_service.dart';
 import '../../theme/app_theme.dart';
+import '../../pages/clerk/product_select_page.dart';
+import '../../router/app_router.dart';
 
 /// 动态表单页 Provider
 final zFormDetailProvider =
@@ -32,6 +39,18 @@ class ZFormSubmittedListPage extends ConsumerWidget {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: const Text('我的提交记录'),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
@@ -153,7 +172,6 @@ class _ZFormEditPageState extends ConsumerState<ZFormEditPage> {
   final Map<int, dynamic> _fieldValues = {}; // columnId -> value
   bool _isLoading = true;
   bool _isSaving = false;
-  ZForm? _form;
   String? _error;
 
   @override
@@ -170,7 +188,6 @@ class _ZFormEditPageState extends ConsumerState<ZFormEditPage> {
 
     try {
       final form = await _api.getFormDetail(widget.tableId);
-      _form = form;
 
       // 如果是编辑模式，加载已有数据
       if (widget.recordId != null) {
@@ -205,13 +222,26 @@ class _ZFormEditPageState extends ConsumerState<ZFormEditPage> {
     setState(() => _isSaving = true);
 
     try {
+      // 获取表单定义（用于判断字段类型）
+      final form = await ref.read(zFormDetailProvider(widget.tableId).future);
+      final columnTypeMap = {for (final col in form.columns) col.id: col.fieldTypeInfo};
+
       // 构建 fields 参数
       final fields = _fieldValues.entries.map((e) {
         final value = e.value;
         if (value is List) {
           return {'columnID': e.key, 'values': value};
         }
-        return {'columnID': e.key, 'value': value?.toString() ?? ''};
+        final strVal = value?.toString() ?? '';
+        // 处理商品/规格字段：提取ID（格式 "显示名|ID" 或 "显示名|ID/SKUID"）
+        final fieldType = columnTypeMap[e.key];
+        String apiValue = strVal;
+        if ((fieldType == ZFormFieldType.spuSingleChoice ||
+                fieldType == ZFormFieldType.skuSingleChoice) &&
+            strVal.contains('|')) {
+          apiValue = strVal.split('|').last;
+        }
+        return {'columnID': e.key, 'value': apiValue};
       }).toList();
 
       bool success;
@@ -258,6 +288,18 @@ class _ZFormEditPageState extends ConsumerState<ZFormEditPage> {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+                leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.back, size: 24),
+              SizedBox(width: 4),
+              Text('返回', style: TextStyle(fontSize: 17)),
+            ],
+          ),
+          onPressed: () => safePop(context),
+        ),
         middle: Text(widget.recordId != null ? '编辑表单' : '新建表单'),
         trailing: _isSaving
             ? const CupertinoActivityIndicator()
@@ -305,7 +347,7 @@ class _ZFormEditPageState extends ConsumerState<ZFormEditPage> {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppColors.accent.withOpacity(0.1),
+            color: AppColors.accent.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
@@ -334,9 +376,12 @@ class _ZFormEditPageState extends ConsumerState<ZFormEditPage> {
   }
 
   Widget _buildField(ZFormColumn col) {
+    // 不可见字段不渲染
+    if (!col.isVisible) return const SizedBox.shrink();
+
     final type = col.fieldTypeInfo;
     final currentValue = _fieldValues[col.id];
-    final isRequired = col.isRequired ?? false;
+    final isRequired = col.isRequiredField;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -345,10 +390,14 @@ class _ZFormEditPageState extends ConsumerState<ZFormEditPage> {
         children: [
           Row(
             children: [
-              Text(col.name ?? col.field ?? '字段', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+              Text(col.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
               if (isRequired) const Text(' *', style: TextStyle(color: CupertinoColors.destructiveRed, fontSize: 14)),
             ],
           ),
+          if (col.desc != null && col.desc!.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(col.desc!, style: const TextStyle(fontSize: 11, color: CupertinoColors.secondaryLabel)),
+          ],
           const SizedBox(height: 6),
           _buildFieldInput(col, type, currentValue, isRequired),
         ],
@@ -358,19 +407,41 @@ class _ZFormEditPageState extends ConsumerState<ZFormEditPage> {
 
   Widget _buildFieldInput(ZFormColumn col, ZFormFieldType type, dynamic value, bool isRequired) {
     switch (type) {
+      case ZFormFieldType.amount:
+        // 金额字段带单位
+        return Row(
+          children: [
+            Expanded(
+              child: CupertinoTextField(
+                placeholder: col.placeholder ?? '请输入',
+                controller: TextEditingController(text: value?.toString() ?? ''),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (v) => _fieldValues[col.id] = v,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: CupertinoColors.systemGrey6.resolveFrom(context),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+            if (col.unit != null) ...[
+              const SizedBox(width: 8),
+              Text(col.unit!, style: const TextStyle(fontSize: 14, color: CupertinoColors.secondaryLabel)),
+            ],
+          ],
+        );
+
       case ZFormFieldType.singleLineText:
       case ZFormFieldType.integer:
       case ZFormFieldType.decimal:
-      case ZFormFieldType.amount:
         return CupertinoTextField(
           placeholder: col.placeholder ?? '请输入',
           controller: TextEditingController(text: value?.toString() ?? ''),
           keyboardType: type == ZFormFieldType.integer
               ? TextInputType.number
-              : (type == ZFormFieldType.decimal || type == ZFormFieldType.amount)
-                  ? const TextInputType.numberWithOptions(decimal: true)
-                  : TextInputType.text,
+              : const TextInputType.numberWithOptions(decimal: true),
           onChanged: (v) => _fieldValues[col.id] = v,
+          maxLength: col.maxValue,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: CupertinoColors.systemGrey6.resolveFrom(context),
@@ -383,6 +454,7 @@ class _ZFormEditPageState extends ConsumerState<ZFormEditPage> {
           placeholder: col.placeholder ?? '请输入',
           controller: TextEditingController(text: value?.toString() ?? ''),
           maxLines: 3,
+          maxLength: col.maxValue,
           onChanged: (v) => _fieldValues[col.id] = v,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -400,9 +472,33 @@ class _ZFormEditPageState extends ConsumerState<ZFormEditPage> {
           placeholder: col.placeholder ?? '请选择',
         );
 
-      case ZFormFieldType.singleChoice:
+      case ZFormFieldType.time:
+        return _DateTimeField(
+          value: value?.toString(),
+          mode: CupertinoDatePickerMode.time,
+          onChanged: (v) => _fieldValues[col.id] = v,
+          placeholder: col.placeholder ?? '请选择时间',
+        );
+
       case ZFormFieldType.spuSingleChoice:
+        return _ProductChoiceField(
+          columnId: col.id,
+          fieldType: ZFormFieldType.spuSingleChoice,
+          currentValue: value?.toString(),
+          onChanged: (v) => _fieldValues[col.id] = v,
+          placeholder: col.placeholder ?? '请选择商品',
+        );
+
       case ZFormFieldType.skuSingleChoice:
+        return _ProductChoiceField(
+          columnId: col.id,
+          fieldType: ZFormFieldType.skuSingleChoice,
+          currentValue: value?.toString(),
+          onChanged: (v) => _fieldValues[col.id] = v,
+          placeholder: col.placeholder ?? '请选择商品规格',
+        );
+
+      case ZFormFieldType.singleChoice:
       case ZFormFieldType.cateSingleChoice:
       case ZFormFieldType.deptSingleChoice:
       case ZFormFieldType.emplSingleChoice:
@@ -431,18 +527,6 @@ class _ZFormEditPageState extends ConsumerState<ZFormEditPage> {
           values: (value as List?)?.cast<String>() ?? [],
           onChanged: (v) => _fieldValues[col.id] = v,
         );
-
-      default:
-        return CupertinoTextField(
-          placeholder: '不支持的字段类型: ${type.value}',
-          controller: TextEditingController(text: value?.toString() ?? ''),
-          onChanged: (v) => _fieldValues[col.id] = v,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: CupertinoColors.systemGrey6.resolveFrom(context),
-            borderRadius: BorderRadius.circular(8),
-          ),
-        );
     }
   }
 }
@@ -467,13 +551,6 @@ class _DateTimeField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    DateTime? initial;
-    if (value != null && value!.isNotEmpty) {
-      try {
-        initial = DateTime.parse(value!);
-      } catch (_) {}
-    }
-
     return GestureDetector(
       onTap: () => _showPicker(context),
       child: Container(
@@ -499,7 +576,16 @@ class _DateTimeField extends StatelessWidget {
   }
 
   void _showPicker(BuildContext context) {
-    DateTime initial = this.initial ?? DateTime.now();
+    DateTime init;
+    if (value != null && value!.isNotEmpty) {
+      try {
+        init = DateTime.parse(value!);
+      } catch (_) {
+        init = DateTime.now();
+      }
+    } else {
+      init = DateTime.now();
+    }
     showCupertinoModalPopup(
       context: context,
       builder: (ctx) => Container(
@@ -512,7 +598,7 @@ class _DateTimeField extends StatelessWidget {
               children: [
                 CupertinoButton(child: const Text('取消'), onPressed: () => Navigator.pop(ctx)),
                 CupertinoButton(child: const Text('确定'), onPressed: () {
-                  onChanged(initial.toIso8601String().substring(0, 19));
+                  onChanged(init.toIso8601String().substring(0, 19));
                   Navigator.pop(ctx);
                 }),
               ],
@@ -520,8 +606,8 @@ class _DateTimeField extends StatelessWidget {
             Expanded(
               child: CupertinoDatePicker(
                 mode: mode,
-                initialDateTime: initial,
-                onDateTimeChanged: (dt) => initial = dt,
+                initialDateTime: init,
+                onDateTimeChanged: (dt) {},
               ),
             ),
           ],
@@ -662,7 +748,7 @@ class _MultipleChoiceFieldState extends State<_MultipleChoiceField> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: isSelected ? AppColors.accent.withOpacity(0.15) : CupertinoColors.systemGrey6.resolveFrom(context),
+              color: isSelected ? AppColors.accent.withValues(alpha: 0.15) : CupertinoColors.systemGrey6.resolveFrom(context),
               borderRadius: BorderRadius.circular(16),
               border: isSelected ? Border.all(color: AppColors.accent) : null,
             ),
@@ -680,8 +766,111 @@ class _MultipleChoiceFieldState extends State<_MultipleChoiceField> {
   }
 }
 
-/// 附件字段
-class _AttachmentField extends StatelessWidget {
+/// 商品/规格选择字段（SPU单选、SKU单选）
+class _ProductChoiceField extends StatelessWidget {
+  final int columnId;
+  final ZFormFieldType fieldType;
+  final String? currentValue;
+  final ValueChanged<String?> onChanged;
+  final String placeholder;
+
+  const _ProductChoiceField({
+    required this.columnId,
+    required this.fieldType,
+    this.currentValue,
+    required this.onChanged,
+    required this.placeholder,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // 解析当前值：格式为 "productId" 或 "productId/skuId"
+    String? displayText = currentValue;
+    if (currentValue != null && currentValue!.contains('/')) {
+      final parts = currentValue!.split('/');
+      displayText = parts.length >= 2 ? '商品 / ${parts[1]}' : currentValue;
+    } else if (currentValue != null && currentValue!.isNotEmpty) {
+      displayText = '商品 ID: $currentValue';
+    }
+
+    return GestureDetector(
+      onTap: () => _selectProduct(context),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: CupertinoColors.systemGrey6.resolveFrom(context),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                displayText ?? placeholder,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: displayText == null
+                      ? CupertinoColors.placeholderText
+                      : CupertinoColors.label,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (displayText != null)
+                  GestureDetector(
+                    onTap: () => onChanged(null),
+                    child: const Padding(
+                      padding: EdgeInsets.only(right: 8),
+                      child: Icon(
+                        CupertinoIcons.xmark_circle_fill,
+                        size: 16,
+                        color: CupertinoColors.systemGrey3,
+                      ),
+                    ),
+                  ),
+                Icon(
+                  fieldType == ZFormFieldType.skuSingleChoice
+                      ? CupertinoIcons.cube_box
+                      : CupertinoIcons.cube,
+                  size: 16,
+                  color: CupertinoColors.systemGrey,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _selectProduct(BuildContext context) async {
+    final isSku = fieldType == ZFormFieldType.skuSingleChoice;
+
+    if (isSku) {
+      final result = await ProductSelectPage.selectProductWithResult(context, null);
+      if (result != null) {
+        final skuLabel = result.sku != null
+            ? '${result.product.id}/${result.sku!.id}'
+            : '${result.product.id}';
+        final displayLabel = result.sku != null
+            ? '${result.product.name} / ${result.sku!.name}'
+            : result.product.name;
+        onChanged('$displayLabel|$skuLabel');
+      }
+    } else {
+      final product = await ProductSelectPage.selectProduct(context);
+      if (product != null) {
+        onChanged('${product.name}|${product.id}');
+      }
+    }
+  }
+}
+
+/// 附件字段（支持多图上传）
+class _AttachmentField extends StatefulWidget {
   final List<String> values;
   final ValueChanged<List<String>> onChanged;
 
@@ -691,28 +880,103 @@ class _AttachmentField extends StatelessWidget {
   });
 
   @override
+  State<_AttachmentField> createState() => _AttachmentFieldState();
+}
+
+class _AttachmentFieldState extends State<_AttachmentField> {
+  final ImagePicker _picker = ImagePicker();
+  final Dio _dio = Dio();
+  final TokenService _tokenService = TokenService();
+
+  /// 待上传的本地路径
+  final List<String> _pending = [];
+
+  Future<void> _pickImage(ImageSource source) async {
+    final XFile? image = await _picker.pickImage(
+      source: source,
+      imageQuality: 85,
+      maxWidth: 1920,
+    );
+    if (image == null) return;
+
+    setState(() => _pending.add(image.path));
+
+    try {
+      final url = await _upload(image);
+      if (mounted) {
+        setState(() {
+          _pending.remove(image.path);
+          widget.onChanged([...widget.values, url]);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _pending.remove(image.path));
+        showCupertinoDialog(
+          context: context,
+          builder: (ctx) => CupertinoAlertDialog(
+            title: const Text('上传失败'),
+            content: Text('$e'),
+            actions: [
+              CupertinoDialogAction(child: const Text('确定'), onPressed: () => Navigator.pop(ctx)),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
+  Future<String> _upload(XFile image) async {
+    final formData = FormData.fromMap({
+      'file': await MultipartFile.fromFile(image.path, filename: image.name),
+    });
+    final token = await _tokenService.getToken();
+    final resp = await _dio.post(
+      '${ApiConfig.baseUrl}upload',
+      data: formData,
+      options: Options(headers: {'Authorization': token ?? ''}),
+    );
+    final url = resp.data['res']?['url'] as String? ??
+        resp.data['res']?['path'] as String? ?? '';
+    if (url.isEmpty) throw Exception('上传返回路径为空');
+    return url;
+  }
+
+  void _removeValue(int index) {
+    final updated = List<String>.from(widget.values);
+    updated.removeAt(index);
+    widget.onChanged(updated);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         GestureDetector(
           onTap: () {
-            // TODO: 接入 image_picker 实现文件上传
-            showCupertinoDialog(
+            showCupertinoModalPopup(
               context: context,
               builder: (ctx) => CupertinoActionSheet(
                 title: const Text('添加附件'),
                 actions: [
                   CupertinoActionSheetAction(
-                    onPressed: () => Navigator.pop(ctx),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _pickImage(ImageSource.camera);
+                    },
                     child: const Text('拍照'),
                   ),
                   CupertinoActionSheetAction(
-                    onPressed: () => Navigator.pop(ctx),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _pickImage(ImageSource.gallery);
+                    },
                     child: const Text('相册'),
                   ),
                 ],
                 cancelButton: CupertinoActionSheetAction(
+                  isDestructiveAction: true,
                   onPressed: () => Navigator.pop(ctx),
                   child: const Text('取消'),
                 ),
@@ -731,39 +995,116 @@ class _AttachmentField extends StatelessWidget {
                 const Icon(CupertinoIcons.plus_circle, size: 18, color: AppColors.accent),
                 const SizedBox(width: 6),
                 Text(
-                  '添加附件（${values.length}）',
+                  '添加附件（${widget.values.length}）',
                   style: const TextStyle(fontSize: 14, color: AppColors.accent),
                 ),
               ],
             ),
           ),
         ),
-        if (values.isNotEmpty) ...[
+        // 已上传附件
+        if (widget.values.isNotEmpty) ...[
           const SizedBox(height: 8),
-          ...values.asMap().entries.map((e) => Container(
-            margin: const EdgeInsets.only(bottom: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: CupertinoColors.systemGrey5.resolveFrom(context),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Row(
-              children: [
-                const Icon(CupertinoIcons.paperclip, size: 14, color: CupertinoColors.secondaryLabel),
-                const SizedBox(width: 6),
-                Expanded(child: Text(e.value, style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis)),
-                GestureDetector(
-                  onTap: () {
-                    final updated = List<String>.from(values);
-                    updated.removeAt(e.key);
-                    onChanged(updated);
-                  },
-                  child: const Icon(CupertinoIcons.xmark_circle_fill, size: 16, color: CupertinoColors.destructiveRed),
-                ),
-              ],
-            ),
-          )),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ...widget.values.asMap().entries.map((e) => _AttachmentChip(
+                url: e.value,
+                onRemove: () => _removeValue(e.key),
+              )),
+              // 待上传图片
+              ..._pending.map((path) => _PendingAttachmentChip(path: path)),
+            ],
+          ),
         ],
+      ],
+    );
+  }
+}
+
+/// 附件缩略图
+class _AttachmentChip extends StatelessWidget {
+  final String url;
+  final VoidCallback onRemove;
+  const _AttachmentChip({required this.url, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    final isImage = url.contains('image') ||
+        url.endsWith('.jpg') || url.endsWith('.png') ||
+        url.endsWith('.jpeg') || url.endsWith('.gif') ||
+        url.endsWith('.webp');
+    return Stack(
+      children: [
+        Container(
+          width: 60,
+          height: 60,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            color: CupertinoColors.systemGrey5,
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: isImage
+                ? Image.network(url, fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(CupertinoIcons.photo, size: 24))
+                : const Icon(CupertinoIcons.doc, size: 24),
+          ),
+        ),
+        Positioned(
+          right: 0,
+          top: 0,
+          child: GestureDetector(
+            onTap: onRemove,
+            child: Container(
+              width: 18,
+              height: 18,
+              decoration: const BoxDecoration(
+                color: Color(0xFFFF3B30),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(CupertinoIcons.xmark, size: 10, color: CupertinoColors.white),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 待上传图片占位
+class _PendingAttachmentChip extends StatelessWidget {
+  final String path;
+  const _PendingAttachmentChip({required this.path});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Container(
+          width: 60,
+          height: 60,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            color: CupertinoColors.systemGrey5,
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.file(File(path), fit: BoxFit.cover),
+          ),
+        ),
+        Positioned.fill(
+          child: Container(
+            decoration: BoxDecoration(
+              color: CupertinoColors.black.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Center(
+              child: CupertinoActivityIndicator(color: CupertinoColors.white),
+            ),
+          ),
+        ),
       ],
     );
   }

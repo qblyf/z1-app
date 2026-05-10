@@ -1,9 +1,11 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart' show Divider;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../api/usci_api.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 发票助手 - 证照查询页面
 /// 对应 PWA /pages/path-d/invoice-assistant/license-inquiry.tsx
@@ -109,7 +111,7 @@ class _LicenseInquiryPageState extends ConsumerState<LicenseInquiryPage> {
             Expanded(
               child: ListView.separated(
                 itemCount: _usciList.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
+                separatorBuilder: (_, __) => const Divider(height: 1, color: CupertinoColors.separator),
                 itemBuilder: (_, i) {
                   final usci = _usciList[i];
                   final isSelected = _selectedUsci?.id == usci.id;

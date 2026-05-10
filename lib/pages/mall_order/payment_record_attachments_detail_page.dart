@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../api/payment_detail_api.dart';
 import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 /// 支付记录附件详情页
 /// 对应 PWA /pages/path-d/mall-order/payment-record-attachments-detail.tsx
