@@ -1,0 +1,68 @@
+import '../models/financial_expense.dart';
+import 'api_client.dart';
+
+final financialExpenseApi = FinancialExpenseApi();
+
+class FinancialExpenseApi {
+  final ApiClient _client = ApiClient();
+
+  /// 财务支出列表
+  Future<List<FinancialExpenseItem>> list({
+    List<String>? numbers,
+    int? type,
+    int? status,
+    String? title,
+    int? minCreatedAt,
+    int? maxCreatedAt,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final queryParams = <String, dynamic>{
+      'limit': limit,
+      'offset': offset,
+      if (numbers != null && numbers.isNotEmpty) 'financialExpensesNumbers': numbers.join(','),
+      if (type != null) 'financialExpensesTypes': type,
+      if (status != null) 'status': status,
+      if (title != null && title.isNotEmpty) 'title': title,
+      if (minCreatedAt != null) 'minCreatedAt': minCreatedAt,
+      if (maxCreatedAt != null) 'maxCreatedAt': maxCreatedAt,
+    };
+    // 后端 GET /financial-expenses/list，返回 { code, res: [...] }
+    final res = await _client.get('/financial-expenses/list', queryParameters: queryParams);
+    final list = (res.data['res'] as List?) ?? [];
+    return list.map((e) => FinancialExpenseItem.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// 财务支出详情
+  Future<FinancialExpenseItem?> detail(int id) async {
+    // 后端 GET /financial-expenses/detail?id=X，返回 { code, res: {...} }
+    final res = await _client.get('/financial-expenses/detail', queryParameters: {'financialExpensesIDs': id.toString()});
+    final r = res.data['res'];
+    if (r == null || (r is List && r.isEmpty)) return null;
+    if (r is List) return FinancialExpenseItem.fromJson(r[0] as Map<String, dynamic>);
+    if (r is Map<String, dynamic>) return FinancialExpenseItem.fromJson(r);
+    return null;
+  }
+
+  /// 财务支出数量
+  Future<FinancialExpenseSummary> count({
+    int? type,
+    int? status,
+    String? title,
+    int? minCreatedAt,
+    int? maxCreatedAt,
+  }) async {
+    final queryParams = <String, dynamic>{
+      if (type != null) 'financialExpensesTypes': type,
+      if (status != null) 'status': status,
+      if (title != null && title.isNotEmpty) 'title': title,
+      if (minCreatedAt != null) 'minCreatedAt': minCreatedAt,
+      if (maxCreatedAt != null) 'maxCreatedAt': maxCreatedAt,
+    };
+    // 后端 GET /financial-expenses/count，返回 { code, res: { count, totalAmount } }
+    final res = await _client.get('/financial-expenses/count', queryParameters: queryParams);
+    final r = res.data['res'];
+    if (r is Map<String, dynamic>) return FinancialExpenseSummary.fromJson(r);
+    return const FinancialExpenseSummary();
+  }
+}

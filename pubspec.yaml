@@ -1,0 +1,69 @@
+name: z1_app
+description: 掌上高远 - 企业零售管理移动应用
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # UI 组件
+  cupertino_icons: ^1.0.6
+  flutter_svg: ^2.0.9
+
+  # 状态管理
+  provider: ^6.1.1
+  flutter_riverpod: ^3.3.1
+
+  # 网络请求
+  dio: ^5.4.0
+  http: ^1.2.0
+
+  # 本地存储
+  shared_preferences: ^2.2.2
+  flutter_secure_storage: ^10.1.0
+
+  # 路由
+  go_router: ^17.2.3
+
+  # 企业微信登录
+  url_launcher: ^6.2.4
+  app_links: ^6.1.1
+
+  # 工具库
+  intl: any  # 由 flutter_localizations 自动管理版本
+  json_annotation: ^4.8.1
+  equatable: ^2.0.5
+  collection: ^1.18.0
+
+  # UI 增强
+  cached_network_image: ^3.3.1
+  shimmer: ^3.0.0
+  pull_to_refresh_flutter3: ^2.0.2
+
+  # 表单
+  flutter_form_builder: ^10.3.0+2
+  form_builder_validators: ^11.3.0
+
+  # 二维码生成
+  qr_flutter: ^4.1.0
+
+  # 图表
+  fl_chart: ^0.69.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.4.8
+  json_serializable: ^6.7.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/

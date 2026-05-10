@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>$(DEVELOPMENT_LANGUAGE)</string>
+    <key>CFBundleDisplayName</key>
+    <string>掌上高远</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>z1_app</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>$(FLUTTER_BUILD_NAME)</string>
+    <key>CFBundleSignature</key>
+    <string>????</string>
+    <key>CFBundleVersion</key>
+    <string>$(FLUTTER_BUILD_NUMBER)</string>
+    <key>LSRequiresIPhoneOS</key>
+    <true/>
+    <key>UIApplicationSupportsIndirectInputEvents</key>
+    <true/>
+    <key>UILaunchStoryboardName</key>
+    <string>LaunchScreen</string>
+    <key>UIMainStoryboardFile</key>
+    <string>Main</string>
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    <key>UISupportedInterfaceOrientations~ipad</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationPortraitUpsideDown</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    <key>UIViewControllerBasedStatusBarAppearance</key>
+    <false/>
+    <key>CADisableMinimumFrameDurationOnPhone</key>
+    <true/>
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+        <string>armv7</string>
+    </array>
+
+    <!-- 权限配置 -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <true/>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
+
+    <!-- 相机权限 -->
+    <key>NSCameraUsageDescription</key>
+    <string>需要相机权限来扫码</string>
+
+    <!-- 位置权限 -->
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>需要位置权限来签到</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>需要位置权限来签到</string>
+
+    <!-- 相册权限 -->
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>需要相册权限来上传图片</string>
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>需要相册权限来保存图片</string>
+
+    <!-- 通讯录权限 -->
+    <key>NSContactsUsageDescription</key>
+    <string>需要通讯录权限来选择联系人</string>
+
+    <!-- 应用 URL Scheme（用于企业微信回调） -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>CFBundleURLName</key>
+            <string>com.z1.z1_app</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <!-- 企业微信登录回调 -->
+                <string>z1app</string>
+                <!-- 企业微信授权回调 (wwauth + AgentId) -->
+                <string>wwauth1000003</string>
+            </array>
+        </dict>
+    </array>
+
+    <!-- 企业微信 URL Scheme（用于打开企业微信） -->
+    <key>LSApplicationQueriesSchemes</key>
+    <array>
+        <string>wxwork</string>
+        <string>weixin</string>
+        <string>dingtalk</string>
+    </array>
+</dict>
+</plist>
