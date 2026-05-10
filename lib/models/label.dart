@@ -4,7 +4,8 @@ import 'package:equatable/equatable.dart';
 enum LabelType {
   member('member', '会员'),
   product('product', '商品'),
-  supplier('supplier', '供应商');
+  supplier('supplier', '供应商'),
+  sku('sku', 'SKU');
 
   final String value;
   final String label;

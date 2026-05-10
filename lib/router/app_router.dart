@@ -29,6 +29,7 @@ import '../pages/employee_score/management_page.dart';
 import '../pages/employee_score/apply_page.dart';
 import '../pages/employee_score/employee_score_info_page.dart';
 import '../pages/employee_score/ranking_page.dart';
+import '../pages/employee_score/reward_punishment_details_page.dart';
 import '../pages/cashier_daily_report/list_page.dart';
 import '../pages/cashier_daily_report/detail_page.dart';
 import '../pages/cashier_daily_report/create_page.dart';
@@ -57,6 +58,7 @@ import '../pages/store_inspection/store_inspection_ready_page.dart';
 import '../pages/store_inspection/store_inspection_info_page.dart';
 import '../pages/store_inspection/store_inspection_logs_page.dart';
 import '../pages/goods_request/list_page.dart';
+import '../pages/goods_request/create_page.dart';
 import '../pages/task_management/list_page.dart';
 import '../pages/task_management/task_log_detail_page.dart';
 import '../pages/customer/customer_birthday_list_page.dart';
@@ -78,17 +80,20 @@ import '../pages/storekeeper_data/area_data_compare_page.dart';
 import '../pages/storekeeper_data/employee_ranking_page.dart';
 import '../pages/storekeeper_data/main_products_page.dart';
 import '../pages/storekeeper_data/analyse_month_page.dart';
+import '../pages/storekeeper_data/developing_task_progress_page.dart';
 import '../pages/storekeeper_data/main_products_employee_page.dart';
 import '../pages/coupon/list_page.dart';
 import '../pages/financial_expense/list_page.dart';
 import '../pages/financial_expense/detail_page.dart';
 import '../pages/financial_expense/create_page.dart';
+import '../pages/financial_expense/settlement_order_page.dart';
 import '../pages/inventory_price/list_page.dart';
 import '../pages/repair_order/list_page.dart';
 import '../pages/repair_order/detail_page.dart';
 import '../pages/appointment_booking/list_page.dart';
 import '../pages/appointment_booking/detail_page.dart';
 import '../pages/notice_center/list_page.dart';
+import '../pages/notice_center/detail_page.dart';
 import '../pages/accounting_voucher/audit_page.dart';
 import '../pages/accounting_voucher/list_page.dart';
 import '../pages/points_redeem_order/list_page.dart';
@@ -165,6 +170,7 @@ class Routes {
   static const String employeeScoreApply = '/employee-score/apply';
   static const String employeeScoreRanking = '/employee-score/ranking';
   static const String employeeScoreInfo = '/employee-score/info/:id';
+  static const String rewardPunishmentDetails = '/employee-score/reward-punishment-details';
   // 收银日报
   static const String cashierDailyReportList = '/cashier-daily-report';
   static const String cashierDailyReportDetail = '/cashier-daily-report/detail/:deptId/:date';
@@ -203,6 +209,7 @@ class Routes {
   static const String storeInspectionInfo = '/store-inspection/info/:logID';
   // 报货单
   static const String goodsRequestList = '/goods-request';
+  static const String goodsRequestCreate = '/goods-request/create';
   // 岗位任务
   static const String taskManagement = '/task-management';
   static const String taskLogDetail = '/task-management/log/:id';
@@ -234,12 +241,15 @@ class Routes {
   static const String storekeeperDataMainProducts = '/storekeeper-data/main-products';
   static const String storekeeperDataMainProductsEmployee = '/storekeeper-data/main-products/employee/:productId';
   static const String storekeeperDataAnalyseMonth = '/storekeeper-data/analyse-month';
+  // 任务进度组件演示
+  static const String developingTaskProgress = '/storekeeper-data/task-progress-demo';
   // 优惠券
   static const String couponList = '/coupon';
   // 财务支出
   static const String financialExpenseList = '/financial-expense';
   static const String financialExpenseDetail = '/financial-expense/detail/:id';
   static const String financialExpenseCreate = '/financial-expense/create';
+  static const String financialExpenseSettlement = '/financial-expense/settlement/:id';
   // 库存价格
   static const String inventoryPriceList = '/inventory-price';
   // 维修单
@@ -250,6 +260,7 @@ class Routes {
   static const String appointmentBookingDetail = '/appointment-booking/:id';
   // 通知中心
   static const String noticeCenter = '/notice-center';
+  static const String noticeDetail = '/notice-center/detail:logId';
   // 会计凭证
   static const String accountingVoucherList = '/accounting-voucher';
   static const String accountingVoucherAudit = '/accounting-voucher/audit/:id';
@@ -552,6 +563,10 @@ final GoRouter appRouter = GoRouter(
         return EmployeeScoreInfoPage(applyId: id);
       },
     ),
+    GoRoute(
+      path: Routes.rewardPunishmentDetails,
+      builder: (context, state) => const RewardPunishmentDetailsPage(),
+    ),
 
     // 收银日报路由（不在 ShellRoute 内，全屏页面）
     GoRoute(
@@ -713,6 +728,10 @@ final GoRouter appRouter = GoRouter(
       path: Routes.goodsRequestList,
       builder: (context, state) => const GoodsRequestListPage(),
     ),
+    GoRoute(
+      path: Routes.goodsRequestCreate,
+      builder: (context, state) => const GoodsRequestCreatePage(),
+    ),
 
     // 岗位任务路由
     GoRoute(
@@ -839,6 +858,10 @@ final GoRouter appRouter = GoRouter(
       path: Routes.storekeeperDataAnalyseMonth,
       builder: (context, state) => const AnalyseMonthPage(),
     ),
+    GoRoute(
+      path: Routes.developingTaskProgress,
+      builder: (context, state) => const DevelopingTaskProgressPage(),
+    ),
 
     // 优惠券路由
     GoRoute(
@@ -861,6 +884,13 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: Routes.financialExpenseCreate,
       builder: (context, state) => const FinancialExpenseCreatePage(),
+    ),
+    GoRoute(
+      path: Routes.financialExpenseSettlement,
+      builder: (context, state) {
+        final id = int.tryParse(state.pathParameters['id'] ?? '') ?? 0;
+        return SettlementOrderPage(expenseId: id);
+      },
     ),
 
     // 库存价格路由
@@ -899,6 +929,15 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: Routes.noticeCenter,
       builder: (context, state) => const NoticeCenterListPage(),
+      routes: [
+        GoRoute(
+          path: 'detail:logId',
+          builder: (context, state) {
+            final logId = int.tryParse(state.pathParameters['logId'] ?? '') ?? 0;
+            return NoticeDetailPage(noticeLogId: logId);
+          },
+        ),
+      ],
     ),
 
     // 会计凭证路由

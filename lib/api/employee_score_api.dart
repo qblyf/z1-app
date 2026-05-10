@@ -150,24 +150,101 @@ class EmployeeScoreApi {
     int limit = 20,
     int offset = 0,
   }) async {
-    // 后端 GET /department-employee-score-give-log/details/list
+    // 后端 GET /department-employee-score-give-log/details-list
     final response = await _client.get(
-      '/department-employee-score-give-log/details/list',
+      '/department-employee-score-give-log/details-list',
       queryParameters: {
-        if (employeeId != null) 'employeeID': employeeId,
-        if (departmentId != null) 'departmentID': departmentId,
-        if (classId != null) 'classID': classId,
-        if (minGivenAt != null) 'minGivenAt': minGivenAt,
-        if (maxGivenAt != null) 'maxGivenAt': maxGivenAt,
+        if (employeeId != null) 'employees': [employeeId],
+        if (departmentId != null) 'emplDepartmentIDs': [departmentId],
+        if (classId != null) 'classIDs': [classId],
+        if (minGivenAt != null) 'minGiveAt': minGivenAt,
+        if (maxGivenAt != null) 'maxGiveAt': maxGivenAt,
         'limit': limit,
         'offset': offset,
       },
     );
-    final list = response.data['list'] ?? response.data['res'];
+    final list = response.data['res'] ?? response.data['list'];
     if (list is List) {
       return list.map((e) => ScoreGiveLog.fromJson(e as Map<String, dynamic>)).toList();
     }
     return [];
+  }
+
+  /// 获取积分发放明细列表（支持多员工/多部门过滤）
+  /// 对应 PWA reward-punishment-details.tsx
+  Future<List<ScoreGiveLog>> getGiveLogDetailsList({
+    List<int>? employeeIdents,
+    List<int>? departmentIds,
+    List<int>? classIds,
+    int? minGiveAt,
+    int? maxGiveAt,
+    int? scoreFrom,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final queryParams = <String, dynamic>{
+      'limit': limit,
+      'offset': offset,
+    };
+    if (employeeIdents != null && employeeIdents.isNotEmpty) {
+      queryParams['employees'] = employeeIdents;
+    }
+    if (departmentIds != null && departmentIds.isNotEmpty) {
+      queryParams['emplDepartmentIDs'] = departmentIds;
+    }
+    if (classIds != null && classIds.isNotEmpty) {
+      queryParams['classIDs'] = classIds;
+    }
+    if (minGiveAt != null) queryParams['minGiveAt'] = minGiveAt;
+    if (maxGiveAt != null) queryParams['maxGiveAt'] = maxGiveAt;
+    if (scoreFrom != null) queryParams['scoreFrom'] = scoreFrom;
+
+    // 后端 GET /department-employee-score-give-log/details-list
+    final response = await _client.get(
+      '/department-employee-score-give-log/details-list',
+      queryParameters: queryParams,
+    );
+    final list = response.data['res'] ?? response.data['list'];
+    if (list is List) {
+      return list.map((e) => ScoreGiveLog.fromJson(e as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
+  /// 获取积分发放明细总数
+  Future<int> getGiveLogDetailsCount({
+    List<int>? employeeIdents,
+    List<int>? departmentIds,
+    List<int>? classIds,
+    int? minGiveAt,
+    int? maxGiveAt,
+    int? scoreFrom,
+  }) async {
+    final queryParams = <String, dynamic>{};
+    if (employeeIdents != null && employeeIdents.isNotEmpty) {
+      queryParams['employees'] = employeeIdents;
+    }
+    if (departmentIds != null && departmentIds.isNotEmpty) {
+      queryParams['emplDepartmentIDs'] = departmentIds;
+    }
+    if (classIds != null && classIds.isNotEmpty) {
+      queryParams['classIDs'] = classIds;
+    }
+    if (minGiveAt != null) queryParams['minGiveAt'] = minGiveAt;
+    if (maxGiveAt != null) queryParams['maxGiveAt'] = maxGiveAt;
+    if (scoreFrom != null) queryParams['scoreFrom'] = scoreFrom;
+
+    // 后端 GET /department-employee-score-give-log/details-count
+    final response = await _client.get(
+      '/department-employee-score-give-log/details-count',
+      queryParameters: queryParams,
+    );
+    final res = response.data['res'] ?? response.data;
+    if (res is Map<String, dynamic>) {
+      return (res['count'] as num?)?.toInt() ?? 0;
+    }
+    if (res is num) return res.toInt();
+    return 0;
   }
 
   /// 获取积分统计（红黑榜）

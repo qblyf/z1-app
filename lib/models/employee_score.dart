@@ -151,55 +151,83 @@ class ScoreApplyItem extends Equatable {
 /// 积分发放记录
 class ScoreGiveLog extends Equatable {
   final int id;
-  final int employeeId;
+  final int employeeId; // 兼容旧字段
+  final int userIdent; // 后端 userIdent 字段
   final String? employeeName;
   final String? avatar;
   final int departmentId;
   final String? departmentName;
   final int score;
+  final int giveValue; // 后端 giveValue 字段（与 score 含义相同）
   final int classId;
   final String? className;
   final String? remark;
+  final String? remarks; // 后端 remarks 字段
   final int givenAt;
   final int givenBy;
   final String? givenByName;
+  final int? group; // 分组
+  final int? createdAt;
+  final int? applyId; // 关联申报ID
 
   const ScoreGiveLog({
     required this.id,
     required this.employeeId,
+    this.userIdent = 0,
     this.employeeName,
     this.avatar,
     required this.departmentId,
     this.departmentName,
     required this.score,
+    this.giveValue = 0,
     required this.classId,
     this.className,
     this.remark,
+    this.remarks,
     required this.givenAt,
     required this.givenBy,
     this.givenByName,
+    this.group,
+    this.createdAt,
+    this.applyId,
   });
 
+  /// 获取实际积分值（优先用 giveValue，其次用 score）
+  int get effectiveScore => giveValue != 0 ? giveValue : score;
+
+  /// 获取实际备注（优先用 remarks，其次用 remark）
+  String? get effectiveRemark => remarks ?? remark;
+
   factory ScoreGiveLog.fromJson(Map<String, dynamic> json) {
+    final empId = json['userIdent'] as int? ??
+        json['employeeID'] as int? ??
+        json['employeeId'] as int? ??
+        0;
     return ScoreGiveLog(
       id: json['id'] as int? ?? 0,
-      employeeId: json['employeeID'] as int? ?? json['employeeId'] as int? ?? 0,
-      employeeName: json['employeeName'] as String?,
+      employeeId: empId,
+      userIdent: json['userIdent'] as int? ?? empId,
+      employeeName: json['employeeName'] as String? ?? json['name'] as String?,
       avatar: json['avatar'] as String?,
       departmentId: json['departmentID'] as int? ?? json['departmentId'] as int? ?? 0,
       departmentName: json['departmentName'] as String?,
       score: json['score'] as int? ?? 0,
+      giveValue: json['giveValue'] as int? ?? 0,
       classId: json['classID'] as int? ?? json['classId'] as int? ?? 0,
       className: json['className'] as String?,
       remark: json['remark'] as String?,
-      givenAt: json['givenAt'] as int? ?? json['given_at'] as int? ?? 0,
-      givenBy: json['givenBy'] as int? ?? json['given_by'] as int? ?? 0,
-      givenByName: json['givenByName'] as String?,
+      remarks: json['remarks'] as String?,
+      givenAt: json['giveAt'] as int? ?? json['givenAt'] as int? ?? 0,
+      givenBy: json['createdBy'] as int? ?? json['givenBy'] as int? ?? json['given_by'] as int? ?? 0,
+      givenByName: json['givenByName'] as String? ?? json['createdByName'] as String?,
+      group: json['group'] as int?,
+      createdAt: json['createdAt'] as int? ?? json['created_at'] as int?,
+      applyId: json['applyID'] as int?,
     );
   }
 
   @override
-  List<Object?> get props => [id, employeeId, score];
+  List<Object?> get props => [id, userIdent, effectiveScore];
 }
 
 /// 积分统计/红黑榜

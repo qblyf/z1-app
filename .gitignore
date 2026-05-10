@@ -32,6 +32,8 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+android/build/
+android/.dart_tool/
 
 # Symbolication related
 app.*.symbols

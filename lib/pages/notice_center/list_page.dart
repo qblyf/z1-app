@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:go_router/go_router.dart';
 import '../../api/notice_center_api.dart';
 import '../../models/notice_center.dart';
 import '../../theme/app_theme.dart';
@@ -138,7 +139,10 @@ class _NoticeCenterListPageState extends ConsumerState<NoticeCenterListPage> {
                         if (index >= _allItems.length) {
                           return const Padding(padding: EdgeInsets.all(16), child: Center(child: CupertinoActivityIndicator()));
                         }
-                        return _NoticeRow(item: _allItems[index]);
+                        return _NoticeRow(
+                          item: _allItems[index],
+                          onTap: () => context.push('/notice-center/detail${_allItems[index].id}'),
+                        );
                       },
                     ),
             ),
@@ -188,73 +192,78 @@ class _StatCard extends StatelessWidget {
 
 class _NoticeRow extends StatelessWidget {
   final NoticeLog item;
-  const _NoticeRow({required this.item});
+  final VoidCallback onTap;
+  const _NoticeRow({required this.item, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final isUnread = item.readStatus == ReadStatus.unread;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      color: isUnread ? const Color(0xFFF0F7FF) : CupertinoColors.white,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              if (isUnread)
-                Container(
-                  width: 8,
-                  height: 8,
-                  margin: const EdgeInsets.only(right: 6),
-                  decoration: const BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        color: isUnread ? const Color(0xFFF0F7FF) : CupertinoColors.white,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                if (isUnread)
+                  Container(
+                    width: 8,
+                    height: 8,
+                    margin: const EdgeInsets.only(right: 6),
+                    decoration: const BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                Expanded(
+                  child: Text(
+                    item.title,
+                    style: AppText.body.copyWith(
+                      fontWeight: isUnread ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              Expanded(
-                child: Text(
-                  item.title,
-                  style: AppText.body.copyWith(
-                    fontWeight: isUnread ? FontWeight.w600 : FontWeight.normal,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                Text(
+                  _formatDate(item.createdAt),
+                  style: AppText.caption.copyWith(color: CupertinoColors.tertiaryLabel.resolveFrom(context)),
                 ),
-              ),
+              ],
+            ),
+            if (item.content.isNotEmpty) ...[
+              const SizedBox(height: 4),
               Text(
-                _formatDate(item.createdAt),
-                style: AppText.caption.copyWith(color: CupertinoColors.tertiaryLabel.resolveFrom(context)),
+                item.content,
+                style: AppText.caption.copyWith(color: CupertinoColors.secondaryLabel.resolveFrom(context)),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
-          ),
-          if (item.content.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text(
-              item.content,
-              style: AppText.caption.copyWith(color: CupertinoColors.secondaryLabel.resolveFrom(context)),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: item.receiverType == ReceiverType.carbonCopy
+                        ? const Color(0xFFFF9500).withValues(alpha: 0.1)
+                        : const Color(0xFF007AFF).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    item.receiverType.label,
+                    style: TextStyle(fontSize: 10, color: item.receiverType == ReceiverType.carbonCopy ? const Color(0xFFFF9500) : const Color(0xFF007AFF)),
+                  ),
+                ),
+              ],
             ),
           ],
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                decoration: BoxDecoration(
-                  color: item.receiverType == ReceiverType.carbonCopy
-                      ? const Color(0xFFFF9500).withValues(alpha: 0.1)
-                      : const Color(0xFF007AFF).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  item.receiverType.label,
-                  style: TextStyle(fontSize: 10, color: item.receiverType == ReceiverType.carbonCopy ? const Color(0xFFFF9500) : const Color(0xFF007AFF)),
-                ),
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }

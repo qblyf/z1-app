@@ -178,6 +178,31 @@ class ProductApi {
     return SkuDetailInfo.fromJson(data[0] as Map<String, dynamic>);
   }
 
+  /// 批量获取 SKU 名称
+  /// 后端 POST /sku/detail（传入多个 ids）
+  /// 返回 Map<skuId, skuName>
+  Future<Map<int, String>> getSkuNames(List<int> skuIds) async {
+    if (skuIds.isEmpty) return {};
+    try {
+      final response = await _client.post(
+        '/sku/detail',
+        data: {'ids': skuIds.take(50).toList()},
+      );
+      final data = response.data['res'] as List<dynamic>? ?? [];
+      return Map.fromEntries(
+        data.map((e) {
+          final map = e as Map<String, dynamic>;
+          return MapEntry(
+            map['id'] as int? ?? 0,
+            map['name'] as String? ?? '商品${map['id']}',
+          );
+        }),
+      );
+    } catch (e) {
+      return {};
+    }
+  }
+
   /// 获取商品库存统计（按仓库）
   /// 后端 POST /stock-stats
   Future<List<SkuStockInfo>> getStockStats({required List<int> productIds, List<int>? warehouseIds}) async {
@@ -413,13 +438,15 @@ class SpuSearchResult {
 /// SKU详情（最低售价等）
 class SkuDetailInfo {
   final int id;
+  final String? name;
   final int? limitPrice;
 
-  SkuDetailInfo({required this.id, this.limitPrice});
+  SkuDetailInfo({required this.id, this.name, this.limitPrice});
 
   factory SkuDetailInfo.fromJson(Map<String, dynamic> json) {
     return SkuDetailInfo(
       id: json['id'] as int? ?? 0,
+      name: json['name'] as String?,
       limitPrice: json['limitPrice'] as int?,
     );
   }

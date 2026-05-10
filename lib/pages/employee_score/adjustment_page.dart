@@ -85,6 +85,15 @@ class EmployeeScoreAdjustmentPage extends ConsumerWidget {
                       onTap: () => context.push('/employee-score/ranking'),
                     ),
                   ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: _MenuCard(
+                      icon: CupertinoIcons.list_bullet,
+                      label: '赏罚明细',
+                      color: const Color(0xFFFF6B6B),
+                      onTap: () => context.push('/employee-score/reward-punishment-details'),
+                    ),
+                  ),
                 ],
               ),
 

@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../api/goods_request_api.dart';
 import '../../models/goods_request.dart';
 import '../../theme/app_theme.dart';
@@ -91,10 +92,20 @@ class _GoodsRequestListPageState extends ConsumerState<GoodsRequestListPage> {
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
         middle: const Text('报货单'),
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          child: const Icon(CupertinoIcons.slider_horizontal_3),
-          onPressed: _showFilterSheet,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              child: const Icon(CupertinoIcons.plus),
+              onPressed: () => context.push('/goods-request/create'),
+            ),
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              child: const Icon(CupertinoIcons.slider_horizontal_3),
+              onPressed: _showFilterSheet,
+            ),
+          ],
         ),
       ),
       child: SafeArea(

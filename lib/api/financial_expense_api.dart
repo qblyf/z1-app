@@ -33,15 +33,43 @@ class FinancialExpenseApi {
     return list.map((e) => FinancialExpenseItem.fromJson(e as Map<String, dynamic>)).toList();
   }
 
-  /// 财务支出详情
-  Future<FinancialExpenseItem?> detail(int id) async {
-    // 后端 GET /financial-expenses/detail?id=X，返回 { code, res: {...} }
-    final res = await _client.get('/financial-expenses/detail', queryParameters: {'financialExpensesIDs': id.toString()});
+  /// 财务支出详情（完整版，含 infos）
+  /// 后端 GET /financial-expenses/detail，返回 { code, res: {...} } FinancialExpenses 类型
+  Future<FinancialExpense?> fullDetail(int id) async {
+    final res = await _client.get(
+      '/financial-expenses/detail',
+      queryParameters: {'financialExpensesIDs': id.toString()},
+    );
     final r = res.data['res'];
     if (r == null || (r is List && r.isEmpty)) return null;
-    if (r is List) return FinancialExpenseItem.fromJson(r[0] as Map<String, dynamic>);
-    if (r is Map<String, dynamic>) return FinancialExpenseItem.fromJson(r);
+    if (r is List) return FinancialExpense.fromJson(r[0] as Map<String, dynamic>);
+    if (r is Map<String, dynamic>) return FinancialExpense.fromJson(r);
     return null;
+  }
+
+  /// 创建财务结算单审批
+  /// 后端 POST /financial-expenses/settle-add，返回审批ID
+  Future<int?> addSettlementApproval({
+    required int financialExpensesType,
+    required String businessType,
+    required String title,
+    required String content,
+    required List<SettlementInfo> infos,
+    required int settleAmount,
+    required String associated,
+  }) async {
+    final body = <String, dynamic>{
+      'financialExpensesType': financialExpensesType,
+      'businessType': businessType,
+      'title': title,
+      'content': content,
+      'infos': infos.map((e) => e.toJson()).toList(),
+      'settleAmount': settleAmount,
+      'associated': associated,
+    };
+    final res = await _client.post('/financial-expenses/settle-add', data: body);
+    final id = res.data['res'];
+    return id is int ? id : null;
   }
 
   /// 财务支出数量

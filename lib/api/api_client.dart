@@ -97,6 +97,10 @@ class ApiClient {
     if (path.startsWith('approval/')) {
       return 'approvalManage';
     }
+    if (path.startsWith('product-warehouse/') ||
+        path.startsWith('warehouse/')) {
+      return 'stockManage';
+    }
     return null;
   }
 

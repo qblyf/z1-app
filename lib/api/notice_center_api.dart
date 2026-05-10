@@ -4,6 +4,26 @@ import '../models/notice_center.dart';
 class NoticeCenterApi {
   final _client = ApiClient();
 
+  /// 标记单条通知为已读
+  Future<bool> markRead(int noticeLogId) async {
+    try {
+      final res = await _client.post('/notice-log/read', data: {'noticeLogID': noticeLogId});
+      return res.data['code'] == 10000;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// 标记所有通知为已读
+  Future<bool> markAllRead() async {
+    try {
+      final res = await _client.post('/notice-log/read-all');
+      return res.data['code'] == 10000;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// 通知记录列表
   Future<List<NoticeLog>> list({
     ReceiverType? receiverType,
@@ -40,9 +60,11 @@ class NoticeCenterApi {
   }
 
   /// 通知详情
-  Future<Map<String, dynamic>?> detail(int noticeLogId) async {
+  Future<NoticeLog?> detail(int noticeLogId) async {
     final res = await _client.get('/notice-log/detail', queryParameters: {'id': noticeLogId});
-    return res.data['res'] as Map<String, dynamic>?;
+    final data = res.data['res'] as Map<String, dynamic>?;
+    if (data == null) return null;
+    return NoticeLog.fromJson(data);
   }
 
   /// 批量已读

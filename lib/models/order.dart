@@ -331,6 +331,20 @@ class MallOrder extends Equatable {
   final String? addressName;
   final String? addressPhone;
   final String? addressDetail;
+  // 新增字段
+  final int? employeeId; // 导购员ID
+  final String? employeeName; // 导购员名称
+  final int? assistantId; // 助理ID
+  final String? assistantName; // 助理名称
+  final String? channel; // 销售渠道
+  final int? coinAmount; // 积分抵扣金额（分）
+  final int? couponAmount; // 优惠券抵扣金额（分）
+  final String? couponTitle; // 优惠券名称
+  final String? discountInfo; // 折扣说明
+  final int? freightAmount; // 运费（分）
+  final List<Map<String, dynamic>>? paymentDetails; // 支付明细
+  final String? invoiceNumber; // 发票号
+  final String? cancelReason; // 取消原因
 
   const MallOrder({
     required this.mallId,
@@ -353,6 +367,19 @@ class MallOrder extends Equatable {
     this.addressName,
     this.addressPhone,
     this.addressDetail,
+    this.employeeId,
+    this.employeeName,
+    this.assistantId,
+    this.assistantName,
+    this.channel,
+    this.coinAmount,
+    this.couponAmount,
+    this.couponTitle,
+    this.discountInfo,
+    this.freightAmount,
+    this.paymentDetails,
+    this.invoiceNumber,
+    this.cancelReason,
   });
 
   factory MallOrder.fromJson(Map<String, dynamic> json) {
@@ -385,6 +412,19 @@ class MallOrder extends Equatable {
       addressName: json['addressName'] as String?,
       addressPhone: json['addressPhone'] as String?,
       addressDetail: json['addressDetail'] as String?,
+      employeeId: json['employeeId'] as int?,
+      employeeName: json['employeeName'] as String?,
+      assistantId: json['assistantId'] as int?,
+      assistantName: json['assistantName'] as String?,
+      channel: json['channel'] as String?,
+      coinAmount: json['coinAmount'] as int?,
+      couponAmount: json['couponAmount'] as int?,
+      couponTitle: json['couponTitle'] as String?,
+      discountInfo: json['discountInfo'] as String?,
+      freightAmount: json['freightAmount'] as int?,
+      paymentDetails: (json['paymentDetails'] as List<dynamic>?)?.cast<Map<String, dynamic>>(),
+      invoiceNumber: json['invoiceNumber'] as String?,
+      cancelReason: json['cancelReason'] as String?,
     );
   }
 

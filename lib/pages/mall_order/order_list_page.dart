@@ -481,14 +481,19 @@ class _MallOrderCard extends StatelessWidget {
 }
 
 /// 商城订单详情页面
-class MallOrderDetailPage extends ConsumerWidget {
+class MallOrderDetailPage extends ConsumerStatefulWidget {
   final String orderNumber;
 
   const MallOrderDetailPage({super.key, required this.orderNumber});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final detailAsync = ref.watch(mallOrderDetailProvider(orderNumber));
+  ConsumerState<MallOrderDetailPage> createState() => _MallOrderDetailPageState();
+}
+
+class _MallOrderDetailPageState extends ConsumerState<MallOrderDetailPage> {
+  @override
+  Widget build(BuildContext context) {
+    final detailAsync = ref.watch(mallOrderDetailProvider(widget.orderNumber));
 
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
@@ -496,12 +501,122 @@ class MallOrderDetailPage extends ConsumerWidget {
         middle: Text('订单详情', style: TextStyle(fontWeight: FontWeight.w600)),
       ),
       child: detailAsync.when(
-        data: (order) => _MallOrderDetailView(order: order),
+        data: (order) => _MallOrderDetailView(
+          order: order,
+          onConfirmPay: () => _confirmPay(context, order),
+          onShip: () => _shipOrder(context, order),
+          onConfirmReceive: () => _confirmReceive(context, order),
+          onCancel: () => _cancelOrder(context, order),
+        ),
         loading: () => const LoadingWidget(message: '加载中...'),
         error: (e, _) => AppErrorWidget(
           message: e.toString(),
-          onRetry: () => ref.invalidate(mallOrderDetailProvider(orderNumber)),
+          onRetry: () => ref.invalidate(mallOrderDetailProvider(widget.orderNumber)),
         ),
+      ),
+    );
+  }
+
+  void _confirmPay(BuildContext context, MallOrder order) {
+    _showTip(context, '请在订单详情页完成支付');
+  }
+
+  void _shipOrder(BuildContext context, MallOrder order) {
+    final expressNameController = TextEditingController();
+    final expressNumberController = TextEditingController();
+    showCupertinoDialog(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('发货'),
+        content: Column(
+          children: [
+            const SizedBox(height: 12),
+            CupertinoTextField(controller: expressNameController, placeholder: '快递名称'),
+            const SizedBox(height: 8),
+            CupertinoTextField(controller: expressNumberController, placeholder: '快递单号'),
+          ],
+        ),
+        actions: [
+          CupertinoDialogAction(isDestructiveAction: true, child: const Text('取消'), onPressed: () => Navigator.pop(ctx)),
+          CupertinoDialogAction(
+            child: const Text('确认发货'),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final api = ref.read(orderApiProvider);
+              final ok = await api.mallOrderShipped(
+                order.number,
+                expressName: expressNameController.text.isNotEmpty ? expressNameController.text : null,
+                expressNumber: expressNumberController.text.isNotEmpty ? expressNumberController.text : null,
+              );
+              if (ok) ref.invalidate(mallOrderDetailProvider(widget.orderNumber));
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmReceive(BuildContext context, MallOrder order) {
+    showCupertinoDialog(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('确认收货'),
+        content: const Text('确认用户已收到货物？'),
+        actions: [
+          CupertinoDialogAction(isDestructiveAction: true, child: const Text('取消'), onPressed: () => Navigator.pop(ctx)),
+          CupertinoDialogAction(
+            child: const Text('确认'),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final api = ref.read(orderApiProvider);
+              final ok = await api.mallOrderConfirmReceived(order.number);
+              if (ok) ref.invalidate(mallOrderDetailProvider(widget.orderNumber));
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _cancelOrder(BuildContext context, MallOrder order) {
+    showCupertinoDialog(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('取消订单'),
+        content: Text('确定取消订单 ${order.number}？'),
+        actions: [
+          CupertinoDialogAction(child: const Text('取消'), onPressed: () => Navigator.pop(ctx)),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            child: const Text('确认取消'),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final api = ref.read(orderApiProvider);
+              bool ok;
+              if (order.status == 0) {
+                ok = await api.mallOrderUnpaidCancel(order.number);
+              } else if (order.status == 1) {
+                ok = await api.mallOrderPaidCancel(order.number);
+              } else {
+                return;
+              }
+              if (ok) {
+                ref.invalidate(mallOrderDetailProvider(widget.orderNumber));
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showTip(BuildContext context, String msg) {
+    showCupertinoDialog(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('提示'),
+        content: Text(msg),
+        actions: [CupertinoDialogAction(child: const Text('确定'), onPressed: () => Navigator.pop(ctx))],
       ),
     );
   }
@@ -509,8 +624,18 @@ class MallOrderDetailPage extends ConsumerWidget {
 
 class _MallOrderDetailView extends StatelessWidget {
   final MallOrder order;
+  final VoidCallback onConfirmPay;
+  final VoidCallback onShip;
+  final VoidCallback onConfirmReceive;
+  final VoidCallback onCancel;
 
-  const _MallOrderDetailView({required this.order});
+  const _MallOrderDetailView({
+    required this.order,
+    required this.onConfirmPay,
+    required this.onShip,
+    required this.onConfirmReceive,
+    required this.onCancel,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -569,22 +694,40 @@ class _MallOrderDetailView extends StatelessWidget {
           _buildSection('商品信息', [
             ...order.products.map((p) => _buildProductRow(context, p)),
             Container(height: 0.5, color: AppColors.divider),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('商品总额', style: AppText.body),
-                Text(order.formattedOrderAmount, style: AppText.body),
-              ],
-            ),
-            const SizedBox(height: 4),
+            // 价格明细
+            _buildPriceRow('商品总额', order.formattedOrderAmount, null),
+            if (order.freightAmount != null && order.freightAmount! > 0)
+              _buildPriceRow('运费', '¥${(order.freightAmount! / 100).toStringAsFixed(2)}', null),
+            if (order.couponAmount != null && order.couponAmount! > 0)
+              _buildPriceRow('优惠券', '-¥${(order.couponAmount! / 100).toStringAsFixed(2)}', const Color(0xFFFF9500)),
+            if (order.coinAmount != null && order.coinAmount! > 0)
+              _buildPriceRow('积分抵扣', '-¥${(order.coinAmount! / 100).toStringAsFixed(2)}', const Color(0xFFFF9500)),
+            if (order.discountAmount < order.orderAmount)
+              _buildPriceRow('折扣', '-¥${((order.orderAmount - order.discountAmount) / 100).toStringAsFixed(2)}', const Color(0xFFFF9500)),
+            Container(height: 0.5, color: AppColors.divider),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('实付金额', style: AppText.subtitle),
-                Text(order.formattedAmount, style: AppText.subtitle.copyWith(color: AppColors.primary)),
+                Text(order.formattedAmount, style: AppText.subtitle.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
               ],
             ),
           ]),
+
+          // 优惠券信息
+          if (order.couponAmount != null && order.couponAmount! > 0)
+            _buildSection('优惠信息', [
+              _buildInfoRow('优惠券', order.couponTitle ?? '已使用优惠券'),
+              _buildInfoRow('优惠金额', '-¥${(order.couponAmount! / 100).toStringAsFixed(2)}'),
+            ]),
+
+          // 导购信息
+          if (order.employeeName != null)
+            _buildSection('导购信息', [
+              _buildInfoRow('导购', order.employeeName!),
+              if (order.assistantName != null)
+                _buildInfoRow('助理', order.assistantName!),
+            ]),
 
           // 快递信息
           if (order.expressName != null || order.expressNumber != null)
@@ -599,6 +742,12 @@ class _MallOrderDetailView extends StatelessWidget {
             _buildInfoRow('下单时间', order.formattedCreatedAt),
             if (order.departmentName != null)
               _buildInfoRow('所属门店', order.departmentName!),
+            if (order.channel != null)
+              _buildInfoRow('销售渠道', order.channel!),
+            if (order.invoiceNumber != null)
+              _buildInfoRow('发票号', order.invoiceNumber!),
+            if (order.cancelReason != null && order.cancelReason!.isNotEmpty)
+              _buildInfoRow('取消原因', order.cancelReason!),
           ]),
 
           // 备注
@@ -661,6 +810,25 @@ class _MallOrderDetailView extends StatelessWidget {
     );
   }
 
+  Widget _buildPriceRow(String label, String value, Color? valueColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: AppText.body),
+          Text(
+            value,
+            style: AppText.body.copyWith(
+              color: valueColor ?? CupertinoColors.label.resolveFrom(context),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildProductRow(BuildContext context, MallOrderProduct p) {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
@@ -701,16 +869,16 @@ class _MallOrderDetailView extends StatelessWidget {
     switch (order.status) {
       case 0: // 待付款
         return _ActionButtons([
-          _Action('取消订单', AppColors.error, () => _cancelOrder(context, order)),
-          _Action('确认付款', AppColors.primary, () => _confirmPay(context, order)),
+          _Action('取消订单', AppColors.error, onCancel),
+          _Action('确认付款', AppColors.primary, onConfirmPay),
         ]);
       case 1: // 已付款待发货
         return _ActionButtons([
-          _Action('发货', AppColors.primary, () => _shipOrder(context, order)),
+          _Action('发货', AppColors.primary, onShip),
         ]);
       case 2: // 已发货待收货
         return _ActionButtons([
-          _Action('确认收货', AppColors.accent, () => _confirmReceive(context, order)),
+          _Action('确认收货', AppColors.accent, onConfirmReceive),
         ]);
       default:
         return const SizedBox.shrink();
@@ -749,35 +917,6 @@ class _MallOrderDetailView extends StatelessWidget {
       default:
         return '';
     }
-  }
-
-  void _confirmPay(BuildContext context, MallOrder order) {
-    _showTip(context, '付款功能开发中');
-  }
-
-  void _shipOrder(BuildContext context, MallOrder order) {
-    _showTip(context, '发货功能开发中');
-  }
-
-  void _confirmReceive(BuildContext context, MallOrder order) {
-    _showTip(context, '确认收货功能开发中');
-  }
-
-  void _cancelOrder(BuildContext context, MallOrder order) {
-    _showTip(context, '取消订单功能开发中');
-  }
-
-  void _showTip(BuildContext context, String msg) {
-    showCupertinoDialog(
-      context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('提示'),
-        content: Text(msg),
-        actions: [
-          CupertinoDialogAction(child: const Text('确定'), onPressed: () => Navigator.pop(ctx)),
-        ],
-      ),
-    );
   }
 }
 

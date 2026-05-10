@@ -457,6 +457,26 @@ class OrderApi {
     return response.data['res'] == true;
   }
 
+  /// 取消未支付订单
+  /// 后端 POST /mall-order/unpaid-cancel
+  Future<bool> mallOrderUnpaidCancel(String orderNumber) async {
+    final response = await _client.post(
+      '/mall-order/unpaid-cancel',
+      data: {'p': orderNumber},
+    );
+    return response.data['res'] == 1;
+  }
+
+  /// 取消已支付订单（需权限审批）
+  /// 后端 POST /mall-order/paid-cancel
+  Future<bool> mallOrderPaidCancel(String orderNumber) async {
+    final response = await _client.post(
+      '/mall-order/paid-cancel',
+      data: {'p': orderNumber},
+    );
+    return response.data['res'] == 1;
+  }
+
   /// 按状态统计商城订单数量
   /// 后端 GET /mall-order/all
   Future<Map<String, int>> getMallOrderStatistics() async {

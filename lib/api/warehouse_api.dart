@@ -120,3 +120,82 @@ class WarehouseInfo {
     return name ?? '仓库$id';
   }
 }
+
+/// 库存商品分布数据
+/// 对应后端 /product-warehouse/list 返回的 ProductWarehouseItem 类型
+class ProductStockDistributionItem {
+  final int? productID;
+  final int? totalStock;
+  final int totalCost;
+  final int? warehouseID;
+
+  const ProductStockDistributionItem({
+    this.productID,
+    this.totalStock,
+    this.totalCost = 0,
+    this.warehouseID,
+  });
+
+  factory ProductStockDistributionItem.fromJson(Map<String, dynamic> json) {
+    return ProductStockDistributionItem(
+      productID: json['productID'] as int?,
+      totalStock: json['totalStock'] as int?,
+      totalCost: json['totalCost'] as int? ?? 0,
+      warehouseID: json['warehouseID'] as int?,
+    );
+  }
+
+  String get stockDisplay => totalStock?.toString() ?? '0';
+  String get costDisplay => '¥${(totalCost / 100).toStringAsFixed(2)}';
+}
+
+/// 库存商品分布 API
+class StockDistributionApi {
+  final ApiClient _client = ApiClient();
+
+  /// 获取库存商品分布详情
+  /// 后端 POST /product-warehouse/list
+  /// fields: 'product' 为商品维度，'warehouse' 为仓库维度
+  Future<List<ProductStockDistributionItem>> getProductDistribution({
+    List<int>? warehouseIDs,
+    List<int>? productIDs,
+    List<int>? labelIDs,
+    List<String>? brands,
+    List<int>? spuIDs,
+    List<int>? spuCateIDs,
+    String fields = 'product',
+    /// 仓库维度时不过滤 stock=0 的记录
+    bool filterZeroStock = true,
+    String? permissionJWT,
+  }) async {
+    final body = <String, dynamic>{
+      'fields': [fields],
+      if (warehouseIDs != null && warehouseIDs.isNotEmpty)
+        'warehouseIDs': warehouseIDs,
+      if (productIDs != null && productIDs.isNotEmpty)
+        'productIDs': productIDs,
+      if (labelIDs != null && labelIDs.isNotEmpty)
+        'labelIDs': labelIDs,
+      if (brands != null && brands.isNotEmpty) 'brands': brands,
+      if (spuIDs != null && spuIDs.isNotEmpty) 'spuIDs': spuIDs,
+      if (spuCateIDs != null && spuCateIDs.isNotEmpty) 'spuCateIDs': spuCateIDs,
+    };
+
+    final res = await _client.post(
+      '/product-warehouse/list',
+      data: body,
+      options: permissionJWT != null
+          ? {'headers': {'Use-Permissions': permissionJWT}}
+          : null,
+    );
+
+    final data = res.data['res'] as List<dynamic>? ?? [];
+    var items = data
+        .map((e) => ProductStockDistributionItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+    if (filterZeroStock) {
+      items = items.where((e) => e.totalStock != null && e.totalStock != 0).toList();
+    }
+    return items;
+  }
+}
